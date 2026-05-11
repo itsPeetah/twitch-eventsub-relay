@@ -1,9 +1,11 @@
 """
-Example WebSocket **subscriber**: connects to the broadcaster from
-``examples/websocket-python/main.py`` (or ``python main.py --use-websockets``) and
+Example WebSocket **subscriber**: connects to the EventSub WS broadcaster and
 subscribes only to ``channel.chat.message``.
 
-Start the broadcaster first::
+Dial settings are built as a :class:`src.websockets.config.WsConfig` instance in code
+(no JSON file).
+
+Start the broadcaster first, e.g.::
 
     python examples/websocket-python/main.py
 
@@ -11,15 +13,18 @@ Then in another terminal::
 
     python examples/websocket-python/subscriber_chat_message.py
 
-Uses bind settings from ``config/ws_config.json`` (same as the server example).
+For literal IPv4 hosts, ``family=socket.AF_INET`` is passed to asyncio.
 """
 
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
+import socket
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
@@ -27,18 +32,35 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from websockets.asyncio.client import connect
 
-from src import load_ws_config
-
-_CONFIG_DIR = _PROJECT_ROOT / "config"
+from src import WsConfig
 
 CHAT_CHANNEL = "channel.chat.message"
+HOST="0.0.0.0"
+
+
+def example_subscriber_ws_config() -> WsConfig:
+    """Host/port of the running broadcaster (edit for your LAN / Pi)."""
+    return WsConfig(host=HOST, port=8765)
+
+
+def _create_connection_kwargs(uri: str) -> dict:
+    host = urlparse(uri).hostname
+    if not host:
+        return {}
+    try:
+        ipaddress.IPv4Address(host)
+    except ValueError:
+        return {}
+    return {"family": socket.AF_INET}
 
 
 async def main() -> None:
-    ws_cfg = load_ws_config(_CONFIG_DIR / "ws_config.json")
+    ws_cfg = example_subscriber_ws_config()
     uri = f"ws://{ws_cfg.host}:{ws_cfg.port}/"
+    tcp_kw = _create_connection_kwargs(uri)
+    print(f"Connecting to {uri!r} (tcp kwargs: {tcp_kw or 'default'})", file=sys.stderr)
 
-    async with connect(uri) as ws:
+    async with connect(uri, **tcp_kw) as ws:
         await ws.send(
             json.dumps({"op": "subscribe", "channels": [CHAT_CHANNEL]}),
         )

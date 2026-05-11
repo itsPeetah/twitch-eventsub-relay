@@ -10,11 +10,20 @@ The [app](./src/app.py) is the main entrypoint for the twitch related logic
 
 Since I will use the notifications elsewhere and I am using RabbitMQ at work (although in Go) I have also implemented a Rabbit sink and consumer (the latter mainly used to test the former) to subscribe and receive the eventsub notifications from outside. Published messages use the EventSub subscription type as the topic routing key (for example `channel.chat.message`).
 
-You can find those in the [rabbit examples](./examples/rabbit-python/).
+Implementation: [`src/rabbit/`](./src/rabbit/). Runnable samples: [`examples/rabbit-python/`](./examples/rabbit-python/).
 
 ## Usage
 
 > Usage documentation was written by Cursor (and checked by me).
+
+**What to run**
+
+| What | Where | Role |
+|------|--------|------|
+| **Primary application** | [`main.py`](./main.py) at the **repository root** | Twitch OAuth + EventSub; optional stdout, RabbitMQ, and WebSocket broadcaster via flags (see below). |
+| **Example programs** | [`examples/`](./examples/) | Alternate entrypoints (their own `main.py` scripts) and small subscriber/publisher demos. They are **not** the same file as root `main.py`. |
+
+If docs say `python main.py`, that means the root file **after** `cd` to the repo root unless a path like `examples/rabbit-python/main.py` is given explicitly.
 
 ### Requirements
 
@@ -49,9 +58,9 @@ pip install -r requirements-dev.txt
 
 Subscription `condition` fields use **numeric user IDs**, not display names or channel login names. Twitch’s own UI shows the login (the channel URL slug), not that internal ID. Look up the numbers with any Twitch **user ID finder** or **user ID lookup** site you are comfortable using: enter the channel login and paste the returned numeric IDs into `twitch_config.json`. For example, [StreamWeasels’ username → ID converter](https://www.streamweasels.com/tools/convert-twitch-username-to-user-id/).
 
-### Running `main.py`
+### Primary application (root `main.py`)
 
-From the repository root (activate `.venv` if you use one):
+From the **repository root** (activate `.venv` if you use one). This is [`./main.py`](./main.py), not the `main.py` files under `examples/`.
 
 ```bash
 python main.py
@@ -63,19 +72,30 @@ python main.py --help
 
 - **Default:** each EventSub notification is printed on stdout (JSON payload).
 - **`--use-rabbitmq`:** also publishes to RabbitMQ using [`config/amqp_config.json`](./config/amqp_config.json). Copy [config/examples/amqp_config.example.json](./config/examples/amqp_config.example.json) there and adjust broker URL / exchange as needed. Optional keys **`reconnect_delay`**, **`reconnect_backoff`**, **`reconnect_max_retries`** (`null` = retry until the broker is up), and **`reconnect_max_delay`** control the initial TCP connect loop in [`AmqpClient`](src/amqp/client.py) when RabbitMQ is not ready yet.
-- **`--use-websockets`:** also starts the WebSocket broadcaster using [`config/ws_config.json`](./config/ws_config.json). Copy [config/examples/ws_config.example.json](./config/examples/ws_config.example.json) there and adjust `host` / `port`. Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting. A minimal Python subscriber is [examples/websocket-python/subscriber_chat_message.py](./examples/websocket-python/subscriber_chat_message.py); a small browser UI lives under [examples/websocket-web/](./examples/websocket-web/) (see its README).
+- **`--use-websockets`:** also starts the WebSocket broadcaster using [`config/ws_config.json`](./config/ws_config.json). Copy [config/examples/ws_config.example.json](./config/examples/ws_config.example.json) there and adjust `host` / `port`. Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting.
+
+To try **downstream** consumers (Rabbit subscriber, WebSocket subscriber, browser UI), use the [examples](#examples) section; those scripts are separate processes from root `main.py`.
 
 ### Examples
 
-Standalone demos (same config layout as above):
+These live under [`examples/`](./examples/). Run them with an explicit path (from repo root or elsewhere—each example’s docstring notes path handling).
 
-- [examples/rabbit-python/](./examples/rabbit-python/) — RabbitMQ publisher (`main.py`) and chat consumer (`rabbitmq_consumer.py`).
-- [examples/websocket-python/](./examples/websocket-python/) — WebSocket broadcaster (`main.py`) and chat subscriber client (`subscriber_chat_message.py`).
-- [examples/websocket-web/](./examples/websocket-web/) — static page that connects to the broadcaster and renders chat (serve over HTTP; see README there).
+**Alternate EventSub entrypoints** (each loads Twitch config from the repo `config/` directory like root `main.py`, but only one sink):
+
+| Script | Purpose |
+|--------|---------|
+| [`examples/rabbit-python/main.py`](./examples/rabbit-python/main.py) | EventSub → RabbitMQ only (`load_amqp_config` / JSON under `config/`). |
+| [`examples/websocket-python/main.py`](./examples/websocket-python/main.py) | EventSub → WebSocket broadcaster only (`load_ws_config` / JSON under `config/`). |
+
+**Small demos** (broker or WS settings built in code—no `amqp_config.json` / `ws_config.json` required for the demo itself):
+
+- [`examples/rabbit-python/rabbitmq_consumer.py`](./examples/rabbit-python/rabbitmq_consumer.py) — AMQP consumer example ([`AmqpConfig`](src/amqp/config.py) in code). Pair with a publisher (root `main.py --use-rabbitmq` or `examples/rabbit-python/main.py`).
+- [`examples/websocket-python/subscriber_chat_message.py`](./examples/websocket-python/subscriber_chat_message.py) — WebSocket client example ([`WsConfig`](src/websockets/config.py) in code). Pair with root `main.py --use-websockets` or `examples/websocket-python/main.py`.
+- [`examples/websocket-web/`](./examples/websocket-web/) — static page in the browser; serve over HTTP (see README there). Connects to the broadcaster started by one of the processes above.
 
 ### Docker Compose (full stack)
 
-Runs RabbitMQ, publishes EventSub notifications to AMQP, and exposes the WebSocket broadcaster (`main.py --use-rabbitmq --use-websockets`).
+Runs RabbitMQ, publishes EventSub notifications to AMQP, and exposes the WebSocket broadcaster. The `twitch_eventsub` service runs **repository root** `main.py` with `python main.py --use-rabbitmq --use-websockets` (see [`docker-compose.yml`](docker-compose.yml)).
 
 **Files:** [`Dockerfile`](Dockerfile), [`docker-entrypoint.sh`](docker-entrypoint.sh), [`docker-compose.yml`](docker-compose.yml), [`.env.example`](.env.example).
 
@@ -138,7 +158,7 @@ After setup, use the same command for normal runs.
 
 **If WebSocket clients on the host cannot connect** while logs show `ws://127.0.0.1:8765/`: bind inside the container is loopback-only. Ensure [`config/docker/ws_config.json`](./config/docker/ws_config.json) sets `"host": "0.0.0.0"` (default in repo). [`EventSubWebSocketBroadcaster`](src/websockets/server.py) logs a **warning** at startup when `host` is loopback-only so this mistake is obvious in stderr/logs.
 
-**If you run on a Raspberry Pi (or any remote machine) and connect from a laptop:** use the Pi’s **LAN IP**, not `localhost` — e.g. `ws://192.168.1.42:8765/` from the laptop (find the IP with `hostname -I` on the Pi). Ensure **`ws_config.json`** uses **`"host": "0.0.0.0"`** (Compose ships [`config/docker/ws_config.json`](./config/docker/ws_config.json) that way). If you run **`main.py` directly on the Pi**, [`config/ws_config.json`](./config/ws_config.json) is often copied from [ws_config.example.json](./config/examples/ws_config.example.json), which defaults to **`127.0.0.1`** and blocks remote clients until you change it. Open the firewall if needed: e.g. `sudo ufw allow 8765/tcp`. Compose publishes **`0.0.0.0:8765`** so Docker listens on all interfaces on the Pi (see [`docker-compose.yml`](docker-compose.yml)).
+**If you run on a Raspberry Pi (or any remote machine) and connect from a laptop:** use the Pi’s **LAN IP**, not `localhost` — e.g. `ws://192.168.1.42:8765/` from the laptop (find the IP with `hostname -I` on the Pi). Ensure **`ws_config.json`** uses **`"host": "0.0.0.0"`** (Compose ships [`config/docker/ws_config.json`](./config/docker/ws_config.json) that way). If you run **repository root** `main.py` directly on the Pi, [`config/ws_config.json`](./config/ws_config.json) is often copied from [ws_config.example.json](./config/examples/ws_config.example.json), which defaults to **`127.0.0.1`** and blocks remote clients until you change it. Open the firewall if needed: e.g. `sudo ufw allow 8765/tcp`. Compose publishes **`0.0.0.0:8765`** so Docker listens on all interfaces on the Pi (see [`docker-compose.yml`](docker-compose.yml)).
 
 Use **interactive** TTY (`stdin_open` / `tty` are enabled in Compose) for first-time OAuth: the app prints the Twitch authorize URL to stdout; complete login in your browser. Published ports:
 
@@ -160,4 +180,4 @@ make setup   # create .venv and pip install -r requirements-dev.txt
 make test    # pytest
 ```
 
-Set **`TWITCH_DEBUG=1`** for more verbose application logging. Set **`NO_LOGS=1`** to skip timestamped files under `logs/` (stderr only); see [`src/logger/app_logger.py`](src/logger/app_logger.py). Compose enables this by default on **`twitch_eventsub`** ([`docker-compose.yml`](docker-compose.yml)); use the same variable when running **`main.py`** locally. [`docker-entrypoint.sh`](docker-entrypoint.sh) respects `NO_LOGS` in the container.
+Set **`TWITCH_DEBUG=1`** for more verbose application logging. Set **`NO_LOGS=1`** to skip timestamped files under `logs/` (stderr only); see [`src/logger/app_logger.py`](src/logger/app_logger.py). Compose enables this by default on **`twitch_eventsub`** ([`docker-compose.yml`](docker-compose.yml)); use the same variable when running **root** `main.py` locally. [`docker-entrypoint.sh`](docker-entrypoint.sh) respects `NO_LOGS` in the container.

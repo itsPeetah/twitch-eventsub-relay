@@ -1,3 +1,14 @@
+"""
+Library surface for Twitch EventSub, optional RabbitMQ publishing, and WebSocket broadcast.
+
+Typical flow: build :class:`~src.app.TwitchApp` with one or more
+:class:`~src.twitch.event_handler.EventHandler` sinks (stdout, :class:`~src.rabbitmq.publisher.RabbitAsyncPublisher`,
+:class:`~src.websockets.server.EventSubWebSocketBroadcaster`), optionally gathered alongside ``bridge.run()`` like ``main.py`` does.
+
+Configuration loaders read JSON under ``config/``: :func:`~src.amqp.config.load_amqp_config`,
+:func:`~src.websockets.config.load_ws_config`, :func:`~src.twitch.app_config.load_twitch_app_config`.
+"""
+
 from .amqp import AmqpClient, AmqpConfig, load_amqp_config
 from .app import TwitchApp
 from .rabbitmq import RabbitAsyncPublisher, RabbitConsumer

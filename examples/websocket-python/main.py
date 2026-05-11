@@ -7,7 +7,7 @@ events (channel strings are opaque to the server).
 
 Run from anywhere (repo root is detected automatically), e.g.:
 
-``python examples/websocket/main.py``
+``python examples/websocket-python/main.py``
 """
 
 from __future__ import annotations

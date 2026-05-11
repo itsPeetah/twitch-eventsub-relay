@@ -16,6 +16,13 @@ from .twitch import (
 
 
 class TwitchApp:
+    """
+    Wires Twitch OAuth, persisted tokens, and EventSub into :meth:`run`.
+
+    ``handlers`` receive each notification as ``(event_type, payload)`` (see
+    :class:`~src.twitch.event_handler.EventHandler`).
+    """
+
     def __init__(
         self,
         config_path: Path | str,

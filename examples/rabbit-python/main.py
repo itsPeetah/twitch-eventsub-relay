@@ -9,12 +9,12 @@ consumers are registered here.
 
 SIGINT / SIGTERM (when supported) cancel :meth:`~src.rabbitmq.RabbitAsyncPublisher.run`
 and :meth:`TwitchApp.run`; :meth:`~src.rabbitmq.RabbitAsyncPublisher.close` drains
-the worker and closes the broker — same pattern as ``rabbitconsumer.py`` in this
+the worker and closes the broker — same pattern as ``rabbitmq_consumer.py`` in this
 directory.
 
 Run from anywhere (repo root is detected automatically), e.g.:
 
-``python examples/rabbitmq/rabbitmain.py``
+``python examples/rabbit-python/main.py``
 """
 
 from __future__ import annotations

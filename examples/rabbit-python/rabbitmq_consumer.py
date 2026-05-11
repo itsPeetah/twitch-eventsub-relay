@@ -4,11 +4,11 @@ Consume Twitch EventSub chat messages from RabbitMQ (asyncio + aio-pika).
 Declares a durable queue bound to the exchange from ``config/amqp_config.json`` with
 routing key ``channel.chat.message`` (topic exchange).
 
-Signal-driven shutdown matches ``rabbitmain.py`` in this directory.
+Signal-driven shutdown matches ``main.py`` in this directory.
 
 Run from anywhere (repo root is detected automatically), e.g.:
 
-``python examples/rabbitmq/rabbitconsumer.py``
+``python examples/rabbit-python/rabbitmq_consumer.py``
 """
 
 from __future__ import annotations

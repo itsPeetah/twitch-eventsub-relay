@@ -1,3 +1,11 @@
+"""
+Twitch EventSub over WebSocket using only the Python standard library.
+
+Connects to ``wss://eventsub.wss.twitch.tv/ws``, completes the welcome handshake,
+creates subscriptions from config, and delivers notifications to an
+:class:`~src.twitch.event_handler.EventHandler`.
+"""
+
 import asyncio
 import base64
 import json
@@ -58,6 +66,8 @@ def _build_masked_frame(opcode: int, payload: bytes, fin: bool = True) -> bytes:
 
 
 class TwitchEventSub:
+    """Stateful EventSub session (connect loop, resubscribe after reconnect)."""
+
     def __init__(
         self,
         config: TwitchAppConfig,

@@ -1,14 +1,15 @@
 """
-Example WebSocket **subscriber**: connects to ``examples/websocket/main.py`` and
+Example WebSocket **subscriber**: connects to the broadcaster from
+``examples/websocket-python/main.py`` (or ``python main.py --use-websockets``) and
 subscribes only to ``channel.chat.message``.
 
 Start the broadcaster first::
 
-    python examples/websocket/main.py
+    python examples/websocket-python/main.py
 
 Then in another terminal::
 
-    python examples/websocket/subscriber_chat_message.py
+    python examples/websocket-python/subscriber_chat_message.py
 
 Uses bind settings from ``config/ws_config.json`` (same as the server example).
 """

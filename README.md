@@ -8,9 +8,9 @@ The [app](./src/app.py) is the main entrypoint for the twitch related logic
 
 ## AMQP and RabbitMQ
 
-Since I will use the notifications elsewhere and I am using RabbitMQ at work (although in Go) I have also implemented a Rabbit sink and consumer (the latter mainly used to test the former) to subscribe and receive the eventsub notifications from outside.
+Since I will use the notifications elsewhere and I am using RabbitMQ at work (although in Go) I have also implemented a Rabbit sink and consumer (the latter mainly used to test the former) to subscribe and receive the eventsub notifications from outside. Published messages use the EventSub subscription type as the topic routing key (for example `channel.chat.message`).
 
-You can find those in the [rabbit examples](./examples/rabbit/)
+You can find those in the [rabbit examples](./examples/rabbit-python/).
 
 ## Usage
 
@@ -61,14 +61,15 @@ python main.py --help
 
 - **Default:** each EventSub notification is printed on stdout (JSON payload).
 - **`--use-rabbitmq`:** also publishes to RabbitMQ using [`config/amqp_config.json`](./config/amqp_config.json). Copy [config/examples/amqp_config.example.json](./config/examples/amqp_config.example.json) there and adjust broker URL / exchange as needed.
-- **`--use-websockets`:** also starts the WebSocket broadcaster using [`config/ws_config.json`](./config/ws_config.json). Copy [config/examples/ws_config.example.json](./config/examples/ws_config.example.json) there and adjust `host` / `port`. Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting. A minimal subscriber is [examples/websocket/subscriber_chat_message.py](./examples/websocket/subscriber_chat_message.py).
+- **`--use-websockets`:** also starts the WebSocket broadcaster using [`config/ws_config.json`](./config/ws_config.json). Copy [config/examples/ws_config.example.json](./config/examples/ws_config.example.json) there and adjust `host` / `port`. Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting. A minimal Python subscriber is [examples/websocket-python/subscriber_chat_message.py](./examples/websocket-python/subscriber_chat_message.py); a small browser UI lives under [examples/websocket-web/](./examples/websocket-web/) (see its README).
 
 ### Examples
 
 Standalone demos (same config layout as above):
 
-- [examples/rabbit/](./examples/rabbit/) — RabbitMQ publisher and consumer.
-- [examples/websocket/](./examples/websocket/) — WebSocket broadcaster and chat subscriber client.
+- [examples/rabbit-python/](./examples/rabbit-python/) — RabbitMQ publisher (`main.py`) and chat consumer (`rabbitmq_consumer.py`).
+- [examples/websocket-python/](./examples/websocket-python/) — WebSocket broadcaster (`main.py`) and chat subscriber client (`subscriber_chat_message.py`).
+- [examples/websocket-web/](./examples/websocket-web/) — static page that connects to the broadcaster and renders chat (serve over HTTP; see README there).
 
 ### Makefile and tests
 

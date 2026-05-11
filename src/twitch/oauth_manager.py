@@ -13,6 +13,8 @@ from .token_database import OAuthTokenDatabase
 
 
 class OAuthManager:
+    """App-access token OAuth (browser redirect + callback server) and optional SQLite token store."""
+
     def __init__(
         self,
         config: TwitchAppConfig,

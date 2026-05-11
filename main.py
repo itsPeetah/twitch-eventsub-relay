@@ -4,16 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from src import (
-    EventHandler,
-    EventSubWebSocketBroadcaster,
-    RabbitAsyncPublisher,
-    TwitchApp,
-    load_amqp_config,
-    load_ws_config,
-)
-from src.aioloop import AppLifecycle
-from src.logger import AppLogger
+from src.core.amqp import load_amqp_config
+from src.core.aioloop import AppLifecycle
+from src.core.logger import AppLogger
+from src.core.rabbit import RabbitAsyncPublisher
+from src.core.twitch import EventHandler
+from src.core.websockets import EventSubWebSocketBroadcaster, load_ws_config
+from src.app import TwitchApp
 
 _APP_DIR = Path(__file__).resolve().parent
 _CONFIG_DIR = _APP_DIR / "config"

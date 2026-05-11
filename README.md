@@ -2,15 +2,15 @@
 
 ## Twitch OAuth and Eventsub Client
 
-In the [twitch module](./src/twitch/) you can find a raw implementation of the applications credentials oauth flow and the eventsub websocket service that do not depend on any external libraries.
+In the core [twitch module](./src/core/twitch/) you can find a raw implementation of the applications credentials oauth flow and the EventSub WebSocket service that do not depend on any external libraries.
 
-The [app](./src/app.py) is the main entrypoint for the twitch related logic
+The [app](./src/app.py) is the main entrypoint for the Twitch-related logic.
 
 ## AMQP and RabbitMQ
 
-Since I will use the notifications elsewhere and I am using RabbitMQ at work (although in Go) I have also implemented a Rabbit sink and consumer (the latter mainly used to test the former) to subscribe and receive the eventsub notifications from outside. Published messages use the EventSub subscription type as the topic routing key (for example `channel.chat.message`).
+Since I will use the notifications elsewhere and I am using RabbitMQ at work (although in Go) I have also implemented a Rabbit sink and consumer (the latter mainly used to test the former) to subscribe and receive the EventSub notifications from outside. Published messages use the EventSub subscription type as the topic routing key (for example `channel.chat.message`).
 
-Implementation: [`src/rabbit/`](./src/rabbit/). Runnable samples: [`examples/README.md`](./examples/README.md).
+Implementation: [`src/core/rabbit/`](./src/core/rabbit/). Runnable samples: [`examples/README.md`](./examples/README.md).
 
 ## Usage
 
@@ -128,8 +128,8 @@ python main.py --help
 
 - **Default:** each EventSub notification is printed on stdout (JSON payload).
 - `--use-rabbitmq`: also publishes to RabbitMQ using `[config/amqp_config.json](./config/amqp_config.json)`.
-  > Optional keys `**reconnect_delay`**, `**reconnect_backoff**`, `**reconnect_max_retries**` (`null`= retry until the broker is up), and`**reconnect_max_delay\*\*`control the initial TCP connect loop in`[AmqpClient](src/amqp/client.py)` when RabbitMQ is not ready yet.
-- `--use-websockets`:also starts the WebSocket broadcaster using `[config/ws_config.json](./config/ws_config.json)`.
+  > Optional keys `**reconnect_delay**`, `**reconnect_backoff**`, `**reconnect_max_retries**` (`null` = retry until the broker is up), and `**reconnect_max_delay**` control the initial TCP connect loop in [`AmqpClient`](src/core/amqp/client.py) when RabbitMQ is not ready yet.
+- `--use-websockets`: also starts the WebSocket broadcaster using `[config/ws_config.json](./config/ws_config.json)`.
   > Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting.
 
 ### Docker Compose (full stack)

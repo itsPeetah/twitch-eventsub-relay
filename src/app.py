@@ -5,7 +5,7 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from .twitch import (
+from .core.twitch import (
     EventHandler,
     OAuthManager,
     TwitchEventSub,

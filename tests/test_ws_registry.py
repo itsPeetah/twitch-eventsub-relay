@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.websockets.registry import ChannelSubscriptionRegistry
+from src.core.websockets.registry import ChannelSubscriptionRegistry
 
 
 def test_registry_subscribe_peers_and_cleanup() -> None:

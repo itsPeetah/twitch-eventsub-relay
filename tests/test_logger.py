@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from src.logger import AppLogger
+from src.core.logger import AppLogger
 
 
 def test_app_logger_log_path_layout(tmp_path_factory) -> None:

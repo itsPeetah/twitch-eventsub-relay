@@ -15,6 +15,6 @@ Each loads Twitch config from the repo `config/` directory like root [`main.py`]
 
 Broker or WebSocket settings are built in code—no `amqp_config.json` / `ws_config.json` required for the demos themselves.
 
-- [`rabbit-python/rabbitmq_consumer.py`](./rabbit-python/rabbitmq_consumer.py) — AMQP consumer ([`AmqpConfig`](../src/amqp/config.py) in code). Pair with a publisher (root `main.py --use-rabbitmq` or `rabbit-python/main.py`).
-- [`websocket-python/subscriber_chat_message.py`](./websocket-python/subscriber_chat_message.py) — WebSocket client ([`WsConfig`](../src/websockets/config.py) in code). Pair with root `main.py --use-websockets` or `websocket-python/main.py`.
+- [`rabbit-python/rabbitmq_consumer.py`](./rabbit-python/rabbitmq_consumer.py) — AMQP consumer ([`AmqpConfig`](../src/core/amqp/config.py) in code). Pair with a publisher (root `main.py --use-rabbitmq` or `rabbit-python/main.py`).
+- [`websocket-python/subscriber_chat_message.py`](./websocket-python/subscriber_chat_message.py) — WebSocket client ([`WsConfig`](../src/core/websockets/config.py) in code). Pair with root `main.py --use-websockets` or `websocket-python/main.py`.
 - [`websocket-web/`](./websocket-web/) — static page in the browser; serve over HTTP (see [README there](./websocket-web/README.md)). Connects to the broadcaster started by one of the processes above.

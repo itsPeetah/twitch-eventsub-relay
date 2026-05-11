@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.amqp.config import AmqpConfig, load_amqp_config
+from src.core.amqp.config import AmqpConfig, load_amqp_config
 
 
 def test_load_amqp_config_defaults(tmp_path: Path) -> None:

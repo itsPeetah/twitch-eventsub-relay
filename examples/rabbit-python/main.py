@@ -27,9 +27,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src import EventHandler, RabbitAsyncPublisher, TwitchApp, load_amqp_config
-from src.aioloop import AppLifecycle
-from src.logger import AppLogger
+from src.core.amqp import load_amqp_config
+from src.core.aioloop import AppLifecycle
+from src.core.logger import AppLogger
+from src.core.rabbit import RabbitAsyncPublisher
+from src.core.twitch import EventHandler
+from src.app import TwitchApp
 
 _CONFIG_DIR = _PROJECT_ROOT / "config"
 

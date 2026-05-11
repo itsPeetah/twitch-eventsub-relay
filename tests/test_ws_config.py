@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.websockets.config import load_ws_config
+from src.core.websockets.config import load_ws_config
 
 
 def test_load_ws_config_ok(tmp_path: Path) -> None:

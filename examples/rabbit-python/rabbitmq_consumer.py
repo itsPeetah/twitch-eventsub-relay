@@ -25,9 +25,10 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src import AmqpConfig, RabbitConsumer
-from src.aioloop import AppLifecycle
-from src.logger import AppLogger
+from src.core.aioloop import AppLifecycle
+from src.core.amqp import AmqpConfig
+from src.core.logger import AppLogger
+from src.core.rabbit import RabbitConsumer
 
 # Twitch EventSub subscription type; must match the publisher routing key.
 EVENT_TYPE = "channel.chat.message"

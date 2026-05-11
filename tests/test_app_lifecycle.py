@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from src.aioloop import AppLifecycle
+from src.core.aioloop import AppLifecycle
 
 
 def test_run_interruptible_without_signal_handlers_runs_main() -> None:

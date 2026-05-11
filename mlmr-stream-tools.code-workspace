@@ -1,0 +1,13 @@
+{
+    "folders": [
+        {
+            "path": "."
+        },
+        {
+            "path": "twitch-authenticator"
+        }
+    ],
+    "settings": {
+        "workbench.colorTheme": "Monokai"
+    }
+}

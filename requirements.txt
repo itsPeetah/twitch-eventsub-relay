@@ -1,8 +1,0 @@
-requests
-flask
-irc
-python-dotenv
-websockets
-gTTS
-flask_socketio
-obs_websocket_py

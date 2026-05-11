@@ -12,7 +12,7 @@ class AmqpConfig:
 
 
 def load_amqp_config(json_path: Path) -> AmqpConfig:
-    """Load RabbitMQ connection settings from ``amqp_config.json``."""
+    """Load RabbitMQ connection settings from JSON (e.g. ``config/amqp_config.json``)."""
     with open(json_path, encoding="utf-8") as f:
         raw = json.load(f)
 

@@ -1,5 +1,6 @@
 from .amqp import AmqpClient, AmqpConfig, load_amqp_config
 from .app import TwitchApp
+from .rabbitmq import RabbitAsyncPublisher, RabbitConsumer
 from .twitch import (
     EventHandler,
     EventSubSubscription,
@@ -17,6 +18,8 @@ __all__ = [
     "EventSubSubscription",
     "OAuthManager",
     "OAuthTokenDatabase",
+    "RabbitAsyncPublisher",
+    "RabbitConsumer",
     "TwitchApp",
     "TwitchAppConfig",
     "TwitchEventSub",

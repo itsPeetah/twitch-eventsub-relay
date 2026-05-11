@@ -1,0 +1,63 @@
+"""
+Like ``main.py``, but forwards EventSub notifications to RabbitMQ.
+
+Publishing uses asyncio + aio-pika: notifications are scheduled onto an
+:class:`asyncio.Queue` from the EventSub coroutine and drained by an async worker
+that awaits :meth:`AmqpClient.publish_json`, so the WebSocket loop never blocks on
+the broker. Only the configured topic exchange is declared; no queues or
+consumers are registered here.
+
+SIGINT / SIGTERM (when supported) cancel :meth:`~src.rabbitmq.RabbitAsyncPublisher.run`
+and :meth:`TwitchApp.run`; :meth:`~src.rabbitmq.RabbitAsyncPublisher.close` drains
+the worker and closes the broker — same pattern as ``rabbitconsumer.py`` in this
+directory.
+
+Run from anywhere (repo root is detected automatically), e.g.:
+
+``python examples/rabbitmq/rabbitmain.py``
+"""
+
+from __future__ import annotations
+
+import asyncio
+import sys
+from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from src import EventHandler, RabbitAsyncPublisher, TwitchApp, load_amqp_config
+from src.aioloop import AppLifecycle
+from src.logger import AppLogger
+
+_CONFIG_DIR = _PROJECT_ROOT / "config"
+
+
+async def main() -> None:
+    logger = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_rabbitmq")
+    amqp_cfg = load_amqp_config(_CONFIG_DIR / "amqp_config.json")
+
+    bridge = RabbitAsyncPublisher(amqp_cfg, logger=logger)
+
+    app = TwitchApp(
+        config_path=_CONFIG_DIR / "twitch_config.json",
+        token_db_path=_PROJECT_ROOT / "tokens.sqlite",
+        logger=logger,
+        handler=EventHandler(bridge.publish_event),
+    )
+
+    async with AppLifecycle() as ctl:
+        try:
+            await ctl.run_interruptible(
+                asyncio.gather(
+                    bridge.run(),
+                    app.run(),
+                )
+            )
+        finally:
+            await bridge.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

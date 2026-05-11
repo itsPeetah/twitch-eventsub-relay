@@ -1,5 +1,5 @@
 """Asyncio entrypoint helpers: SIGINT/SIGTERM → graceful shutdown."""
 
-from .shutdown_loop import ShutdownLoop
+from .app_lifecycle import AppLifecycle
 
-__all__ = ["ShutdownLoop"]
+__all__ = ["AppLifecycle"]

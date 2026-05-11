@@ -223,6 +223,9 @@ __marimo__/
 
 ################## MY STUFF ##################
 
+# Runtime logs (timestamped files under logs/)
+logs/
+
 # macOS
 
 .DS_Store

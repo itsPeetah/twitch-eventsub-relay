@@ -1,4 +1,4 @@
-"""Stateful asyncio shutdown coordination (signals + helpers)."""
+"""Stateful asyncio app lifecycle: signal-driven shutdown coordination."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ from collections.abc import Awaitable
 from types import TracebackType
 
 
-class ShutdownLoop:
+class AppLifecycle:
     """
     Stateful shutdown coordination for ``asyncio.run`` entrypoints.
 
     Holds the shared :class:`asyncio.Event`, installed signal numbers, and helpers
-    to race an app coroutine against shutdown or to idle until shutdown.
+    to run work until interrupted by shutdown (see :meth:`run_interruptible`).
 
-    Use as ``async with ShutdownLoop() as ctl:`` to register handlers on entry
-    and remove them on exit; :meth:`install` and :meth:`remove` stay available for
-    custom lifetimes.
+    Use as ``async with AppLifecycle() as lifecycle:`` to register handlers on
+    entry and remove them on exit; :meth:`install` and :meth:`remove` stay
+    available for custom lifetimes.
     """
 
     def __init__(self) -> None:
@@ -25,7 +25,7 @@ class ShutdownLoop:
         self._installed_signals: list[int] = []
         self._install_attempted = False
 
-    async def __aenter__(self) -> ShutdownLoop:
+    async def __aenter__(self) -> AppLifecycle:
         self.install()
         return self
 
@@ -79,7 +79,7 @@ class ShutdownLoop:
         self._installed_signals.clear()
         self._install_attempted = False
 
-    async def race_with_shutdown(self, main: Awaitable[None]) -> None:
+    async def run_interruptible(self, main: Awaitable[None]) -> None:
         """
         Run ``main`` concurrently with :attr:`shutdown` when signals were
         installed; cancel whichever finishes second. If none were installed,
@@ -111,13 +111,3 @@ class ShutdownLoop:
         if isinstance(exc, asyncio.CancelledError):
             return
         raise exc
-
-    async def idle_until_shutdown(self) -> None:
-        """
-        Wait until :attr:`shutdown` is set, or block forever if no signal
-        handlers were installed.
-        """
-        if self.signals_installed:
-            await self._shutdown.wait()
-        else:
-            await asyncio.Future()

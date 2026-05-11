@@ -27,13 +27,21 @@ class TwitchAppConfig:
     events: tuple[EventSubSubscription, ...]
 
 
+def _dotenv_path_for_config(json_path: Path) -> Path:
+    """Prefer ``<config_dir>/.env``; otherwise project-root ``.env`` (parent of config dir)."""
+    beside_json = json_path.parent / ".env"
+    if beside_json.is_file():
+        return beside_json
+    return json_path.parent.parent / ".env"
+
+
 def load_twitch_app_config(
     json_path: Path,
     *,
     dotenv_path: Path | None = None,
 ) -> TwitchAppConfig:
-    """Load ``twitch_config.json`` and credentials from ``.env`` (via python-dotenv)."""
-    env_path = dotenv_path if dotenv_path is not None else json_path.parent / ".env"
+    """Load Twitch JSON (e.g. ``config/twitch_config.json``) and ``.env`` (python-dotenv)."""
+    env_path = dotenv_path if dotenv_path is not None else _dotenv_path_for_config(json_path)
     load_dotenv(env_path)
 
     client_id = os.environ.get("TWITCH_CLIENT_ID", "").strip()

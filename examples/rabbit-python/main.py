@@ -7,8 +7,8 @@ that awaits :meth:`AmqpClient.publish_json`, so the WebSocket loop never blocks 
 the broker. Only the configured topic exchange is declared; no queues or
 consumers are registered here.
 
-SIGINT / SIGTERM (when supported) cancel :meth:`~src.rabbitmq.RabbitAsyncPublisher.run`
-and :meth:`TwitchApp.run`; :meth:`~src.rabbitmq.RabbitAsyncPublisher.close` drains
+SIGINT / SIGTERM (when supported) cancel :meth:`~src.rabbit.RabbitAsyncPublisher.run`
+and :meth:`TwitchApp.run`; :meth:`~src.rabbit.RabbitAsyncPublisher.close` drains
 the worker and closes the broker — same pattern as ``rabbitmq_consumer.py`` in this
 directory.
 

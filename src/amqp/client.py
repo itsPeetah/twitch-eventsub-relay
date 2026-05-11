@@ -20,7 +20,7 @@ class AmqpClient:
 
     Use one instance per asyncio loop; do not share across threads.
 
-    Logging is done by callers (e.g. :class:`~src.rabbitmq.RabbitAsyncPublisher`)
+    Logging is done by callers (e.g. :class:`~src.rabbit.RabbitAsyncPublisher`)
     using the application logger from :class:`~src.logger.AppLogger`.
     """
 

@@ -9,6 +9,7 @@ import webbrowser
 from pathlib import Path
 
 from .app_config import TwitchAppConfig
+from .token_database import OAuthTokenDatabase
 
 
 class OAuthManager:
@@ -16,12 +17,17 @@ class OAuthManager:
         self,
         config: TwitchAppConfig,
         logger: logging.Logger,
-        token_file: str | Path = "tokens.json",
+        token_db: str | Path | None = None,
     ):
         self.config = config
         self.logger = logger
-        self.token_file = Path(token_file)
-        self.tokens = self.load_tokens()
+        db_path = Path(token_db) if token_db is not None else Path("tokens.sqlite")
+        self._tokens_db = OAuthTokenDatabase(db_path)
+        self.tokens = self._tokens_db.load()
+        if self.tokens:
+            self.logger.debug("loaded tokens from %s", self._tokens_db.path)
+        else:
+            self.logger.debug("no token database %s (yet)", self._tokens_db.path)
 
     def oauth_redirect_uri(self) -> str:
         return self.config.oauth_redirect_uri
@@ -37,29 +43,17 @@ class OAuthManager:
             port = 80
         return host, port
 
-    def load_tokens(self):
-        try:
-            with open(self.token_file, "r") as f:
-                tokens = json.load(f)
-                self.logger.debug("loaded tokens from %s", self.token_file)
-                return tokens
-        except OSError:
-            self.logger.debug("no token file %s (yet)", self.token_file)
-            return None
-        except json.JSONDecodeError:
-            self.logger.debug("token file %s is invalid JSON", self.token_file)
-            return None
-
     def save_tokens(self, tokens):
-        self.tokens = tokens
-        self.tokens["expires_at"] = time.time() + tokens["expires_in"]
-        with open(self.token_file, "w") as f:
-            json.dump(self.tokens, f)
+        self.tokens = self._tokens_db.save(dict(tokens))
         self.logger.debug(
             "saved tokens expires_at=%s (in %.0fs)",
             self.tokens["expires_at"],
             self.tokens["expires_at"] - time.time(),
         )
+
+    def _clear_token_store(self) -> None:
+        self.tokens = None
+        self._tokens_db.clear()
 
     def _scopes_requested(self) -> frozenset[str]:
         return frozenset(self.config.scopes)
@@ -79,20 +73,12 @@ class OAuthManager:
                 self.logger.info(
                     "cached token has no scope metadata; re-authorizing against config"
                 )
-                self.tokens = None
-                try:
-                    self.token_file.unlink(missing_ok=True)
-                except OSError:
-                    pass
+                self._clear_token_store()
             elif granted != self._scopes_requested():
                 self.logger.info(
                     "OAuth scopes in config changed; discarding cached token and re-authorizing"
                 )
-                self.tokens = None
-                try:
-                    self.token_file.unlink(missing_ok=True)
-                except OSError:
-                    pass
+                self._clear_token_store()
 
         if not self.tokens:
             self.logger.debug("get_token: starting interactive authorize")

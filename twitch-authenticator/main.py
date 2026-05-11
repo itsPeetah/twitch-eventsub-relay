@@ -14,7 +14,7 @@ _APP_DIR = Path(__file__).resolve().parent
 """
 How it works:
 OAuth Flow:
-It checks for a tokens.json. If missing, it opens your browser.
+It loads OAuth tokens from a SQLite file beside ``main.py`` (default ``tokens.sqlite``); if missing, it opens your browser.
 It spins up a temporary http.server on the host/port from config oauth_redirect_uri to grab the code after you click "Authorize."
 It handles token refreshing automatically by checking the expires_at timestamp before it expires.
 Internal WebSocket Server:
@@ -84,7 +84,7 @@ async def main(logger: logging.Logger):
         list(config.scopes),
     )
 
-    oauth = OAuthManager(config, logger, token_file=_APP_DIR / "tokens.json")
+    oauth = OAuthManager(config, logger, token_db=_APP_DIR / "tokens.sqlite")
     handler = EventHandler(print_eventsub_event)
     twitch = TwitchEventSub(config, oauth, handler, logger)
 

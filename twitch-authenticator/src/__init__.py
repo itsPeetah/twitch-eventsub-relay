@@ -2,6 +2,7 @@ from .twitch import (
     EventHandler,
     EventSubSubscription,
     OAuthManager,
+    OAuthTokenDatabase,
     TwitchAppConfig,
     TwitchEventSub,
     load_twitch_app_config,
@@ -10,6 +11,7 @@ from .twitch import (
 __all__ = [
     "EventSubSubscription",
     "OAuthManager",
+    "OAuthTokenDatabase",
     "TwitchAppConfig",
     "TwitchEventSub",
     "EventHandler",

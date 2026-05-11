@@ -40,7 +40,7 @@ Create a file named config.json:
 {
     "client_id": "YOUR_CLIENT_ID",
     "client_secret": "YOUR_CLIENT_SECRET",
-    "scopes": ["chat:read", "chat:edit", "moderator:read:followers", "subscriptions:read"],
+    "scopes": ["chat:read", "chat:edit", "moderator:read:followers", "channel:read:subscriptions"],
     "events": [
         {"type": "channel.chat.message", "version": "1", "condition": {"broadcaster_user_id": "YOUR_USER_ID", "user_id": "YOUR_USER_ID"}},
         {"type": "channel.follow", "version": "2", "condition": {"broadcaster_user_id": "YOUR_USER_ID", "moderator_user_id": "YOUR_USER_ID"}},

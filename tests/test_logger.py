@@ -30,6 +30,16 @@ def test_app_logger_stem_override(tmp_path_factory) -> None:
     assert cfg.log_path.read_text(encoding="utf-8").strip().endswith("x")
 
 
+def test_app_logger_no_logs_skips_file(monkeypatch, tmp_path_factory) -> None:
+    monkeypatch.setenv("NO_LOGS", "1")
+    proj = tmp_path_factory.mktemp("proj")
+    cfg = AppLogger.create(proj, name="no_file_logs")
+    assert len(cfg.logger.handlers) == 1
+    assert isinstance(cfg.logger.handlers[0], logging.StreamHandler)
+    assert not (proj / "logs").exists()
+    cfg.logger.info("x")
+
+
 def test_app_logger_create_returns_facade(tmp_path_factory) -> None:
     proj = tmp_path_factory.mktemp("proj")
     cfg = AppLogger.create(proj, name="via_create")

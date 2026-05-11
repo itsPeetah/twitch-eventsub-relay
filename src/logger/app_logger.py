@@ -7,9 +7,15 @@ from datetime import datetime
 from pathlib import Path
 
 
+def _no_logs_env() -> bool:
+    """When ``NO_LOGS=1``, skip log files (stderr only) — avoids growing disk on small hosts."""
+    return os.environ.get("NO_LOGS", "").strip() == "1"
+
+
 class AppLogger:
     """
-    Timestamped file under ``<project_root>/logs/`` plus stderr.
+    Timestamped file under ``<project_root>/logs/`` plus stderr, unless ``NO_LOGS=1``
+    is set (then stderr only; no ``logs/`` directory is created).
 
     ``name`` is the ``logging`` logger name; ``stem`` selects the filename suffix
     (defaults to ``name``).
@@ -63,11 +69,15 @@ class AppLogger:
     ) -> None:
         root = Path(project_root)
         file_stem = stem if stem is not None else name
-
         logs_dir = root / "logs"
-        logs_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.log_path = logs_dir / f"{ts}_{file_stem}.log"
+        no_file_logs = _no_logs_env()
+
+        if no_file_logs:
+            self.log_path = logs_dir / ".no_file_logging"
+        else:
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+            self.log_path = logs_dir / f"{ts}_{file_stem}.log"
 
         level = logging.DEBUG if os.environ.get("TWITCH_DEBUG") else logging.INFO
         fmt = logging.Formatter("%(levelname)s %(name)s: %(message)s")
@@ -75,12 +85,13 @@ class AppLogger:
         logger.setLevel(level)
         logger.handlers.clear()
         logger.propagate = False
-        file_handler = logging.FileHandler(
-            self.log_path, mode="w", encoding="utf-8"
-        )
-        file_handler.setFormatter(fmt)
+        if not no_file_logs:
+            file_handler = logging.FileHandler(
+                self.log_path, mode="w", encoding="utf-8"
+            )
+            file_handler.setFormatter(fmt)
+            logger.addHandler(file_handler)
         stream_handler = logging.StreamHandler(sys.stderr)
         stream_handler.setFormatter(fmt)
-        logger.addHandler(file_handler)
         logger.addHandler(stream_handler)
         self.logger = logger

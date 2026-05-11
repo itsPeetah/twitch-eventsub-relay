@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 set -e
-mkdir -p /app/logs
-chown -R app:app /app/logs
+if [ "${NO_LOGS:-}" != "1" ]; then
+  mkdir -p /app/logs
+  chown -R app:app /app/logs
+fi
 exec gosu app "$@"

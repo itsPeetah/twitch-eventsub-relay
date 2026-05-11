@@ -8,8 +8,8 @@ services:
     networks:
       - stream_tools
     ports:
-      - "5672:5672" # AMQP
-      - "15672:15672" # RMQ UI
+      - "0.0.0.0:5672:5672" # AMQP
+      - "0.0.0.0:15672:15672" # RMQ UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     environment:
@@ -30,16 +30,18 @@ services:
       rabbitmq:
         condition: service_healthy
     ports:
-      - "4343:4343" # OAuth redirect
-      - "8765:8765" # WS Server
+      # Explicit host IP so other machines (e.g. a laptop) can reach the Pi over LAN.
+      - "0.0.0.0:4343:4343" # OAuth redirect
+      - "0.0.0.0:8765:8765" # WebSocket server
     volumes:
       - ./config/docker:/app/config:ro
       - ./tokens.sqlite:/app/tokens.sqlite
       - ./logs:/app/logs
     env_file:
-      - .env
+      - .env.compose
     environment:
       TWITCH_DEBUG: "1"
+      NO_LOGS: "1"
     stdin_open: true
     tty: true
     command: ["python", "main.py", "--use-rabbitmq", "--use-websockets"]

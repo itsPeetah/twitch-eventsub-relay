@@ -79,42 +79,77 @@ Runs RabbitMQ, publishes EventSub notifications to AMQP, and exposes the WebSock
 
 **Files:** [`Dockerfile`](Dockerfile), [`docker-entrypoint.sh`](docker-entrypoint.sh), [`docker-compose.yml`](docker-compose.yml), [`.env.example`](.env.example).
 
-Compose attaches **`rabbitmq`** and **`twitch_eventsub`** to a bridge network **`stream_tools`** so service DNS names (`rabbitmq`, `twitch_eventsub`) resolve between containers. Application logs go under **`./logs`** on the host (mounted at `/app/logs`; ensure that directory exists and is writable by the container user if logging fails).
+Compose attaches **`rabbitmq`** and **`twitch_eventsub`** to a bridge network **`stream_tools`** so service DNS names (`rabbitmq`, `twitch_eventsub`) resolve between containers.
+
+**NO_LOGS and file logging**
+
+[`docker-compose.yml`](docker-compose.yml) sets **`NO_LOGS=1`** on **`twitch_eventsub`** so log output goes to **stderr only** and nothing is written under `logs/` (good for small disks, e.g. a Raspberry Pi). Behavior is implemented in [`src/logger/app_logger.py`](src/logger/app_logger.py) (`AppLogger`); [`docker-entrypoint.sh`](docker-entrypoint.sh) skips creating `/app/logs` when `NO_LOGS=1`.
+
+To **persist timestamped log files** instead: remove `NO_LOGS` from Compose (or set it to something other than `1`), add volume `- ./logs:/app/logs` under `twitch_eventsub`, and run `mkdir -p logs` on the host. Override via `.env` only works if Compose passes the variable—either keep `NO_LOGS` in [`docker-compose.yml`](docker-compose.yml) or add it under `environment:` from your override file.
 
 **One-time setup**
 
-1. Edit Compose-specific configs under **[`docker/config/`](./docker/config/)** (mounted read-only at `/app/config` in the container):
-   - [`docker/config/twitch_config.json`](./docker/config/twitch_config.json) — replace placeholder Twitch IDs and subscriptions (`YOUR_*`).
-   - [`docker/config/amqp_config.json`](./docker/config/amqp_config.json) — defaults target the Compose **`rabbitmq`** service (`rabbitmq:5672` inside the network).
-   - [`docker/config/ws_config.json`](./docker/config/ws_config.json) — listens on **`0.0.0.0`** so published port **8765** works from the host.
-   Snapshot templates also live under [`config/examples/`](./config/examples/) (`*.docker.example.json`) if you want to reset from copies.
-2. Copy `.env.example` to `.env` next to `docker-compose.yml` and set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`. Optionally put secrets in **`docker/config/.env`** instead; `load_twitch_app_config` prefers `config/.env` beside the mounted JSON (`docker/config/.env` on the host).
-3. Ensure Twitch app OAuth redirect matches **`oauth_redirect_uri`** in `docker/config/twitch_config.json` (typically `http://localhost:4343/oauth/callback`).
+1. Edit Compose configs under **[`config/docker/`](./config/docker/)** (mounted read-only at `/app/config` in the container):
+   - [`config/docker/twitch_config.json`](./config/docker/twitch_config.json) — replace placeholder Twitch IDs and subscriptions (`YOUR_*`).
+   - [`config/docker/amqp_config.json`](./config/docker/amqp_config.json) — defaults target the Compose **`rabbitmq`** service (`rabbitmq:5672` inside the network).
+   - [`config/docker/ws_config.json`](./config/docker/ws_config.json) — listens on **`0.0.0.0`** so published port **8765** works from the host.
+   Templates also appear as [`config/examples/*.docker.example.json`](./config/examples/).
+2. Copy `.env.example` to `.env` next to `docker-compose.yml` and set `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`. Optionally put secrets in **`config/docker/.env`** instead; `load_twitch_app_config` prefers `.env` beside the mounted JSON (`config/docker/.env` on the host).
+3. Ensure Twitch app OAuth redirect matches **`oauth_redirect_uri`** in `config/docker/twitch_config.json` (typically `http://localhost:4343/oauth/callback`).
 4. Create an empty token DB file so the bind mount stays a file (not a directory): `touch tokens.sqlite`
-5. Create the logs directory on the host: `mkdir -p logs`
 
-**Run**
+**Smoke checks** (from the repository root; optional before a full stack run)
 
-```bash
-docker compose up --build
-```
+1. **Compose file + image build**
 
-**If you see `Connect call failed ('127.0.0.1', 5672)` or similar inside `twitch_eventsub`:** the app container’s **`localhost` is not RabbitMQ**. Ensure [`docker/config/amqp_config.json`](./docker/config/amqp_config.json) uses hostname **`rabbitmq`** (see [config/examples/amqp_config.docker.example.json](./config/examples/amqp_config.docker.example.json)). On your **host machine**, clients still use `localhost:5672` thanks to port publishing.
+   ```bash
+   docker compose config -q && docker compose build twitch_eventsub
+   ```
 
-**If WebSocket clients on the host cannot connect** while logs show `ws://127.0.0.1:8765/`: bind inside the container is loopback-only. Ensure [`docker/config/ws_config.json`](./docker/config/ws_config.json) sets `"host": "0.0.0.0"` (default in repo).
+2. **App container imports** (checks the Dockerfile and Python dependencies)
+
+   ```bash
+   docker compose run --rm --no-deps twitch_eventsub python -c "import src; print('import ok')"
+   ```
+
+3. **RabbitMQ** (network + healthcheck)
+
+   ```bash
+   docker compose up -d rabbitmq && docker compose exec rabbitmq rabbitmq-diagnostics -q ping && echo "rabbitmq ok"
+   ```
+
+   Stop when finished:
+
+   ```bash
+   docker compose down
+   ```
+
+4. **Full stack** (needs real setup): `.env` with Twitch credentials, edited [`config/docker/`](./config/docker/) JSON files, and `touch tokens.sqlite`. Default Compose uses **`NO_LOGS=1`** (no `./logs` volume); add `mkdir -p logs` and a logs bind mount only if you turn file logging back on (see **NO_LOGS and file logging** above). Then:
+
+   ```bash
+   docker compose up --build
+   ```
+
+After setup, use the same command for normal runs.
+
+**If you see `Connect call failed ('127.0.0.1', 5672)` or similar inside `twitch_eventsub`:** the app container’s **`localhost` is not RabbitMQ**. Ensure [`config/docker/amqp_config.json`](./config/docker/amqp_config.json) uses hostname **`rabbitmq`** (see [config/examples/amqp_config.docker.example.json](./config/examples/amqp_config.docker.example.json)). On your **host machine**, clients still use `localhost:5672` thanks to port publishing.
+
+**If WebSocket clients on the host cannot connect** while logs show `ws://127.0.0.1:8765/`: bind inside the container is loopback-only. Ensure [`config/docker/ws_config.json`](./config/docker/ws_config.json) sets `"host": "0.0.0.0"` (default in repo). [`EventSubWebSocketBroadcaster`](src/websockets/server.py) logs a **warning** at startup when `host` is loopback-only so this mistake is obvious in stderr/logs.
+
+**If you run on a Raspberry Pi (or any remote machine) and connect from a laptop:** use the Pi’s **LAN IP**, not `localhost` — e.g. `ws://192.168.1.42:8765/` from the laptop (find the IP with `hostname -I` on the Pi). Ensure **`ws_config.json`** uses **`"host": "0.0.0.0"`** (Compose ships [`config/docker/ws_config.json`](./config/docker/ws_config.json) that way). If you run **`main.py` directly on the Pi**, [`config/ws_config.json`](./config/ws_config.json) is often copied from [ws_config.example.json](./config/examples/ws_config.example.json), which defaults to **`127.0.0.1`** and blocks remote clients until you change it. Open the firewall if needed: e.g. `sudo ufw allow 8765/tcp`. Compose publishes **`0.0.0.0:8765`** so Docker listens on all interfaces on the Pi (see [`docker-compose.yml`](docker-compose.yml)).
 
 Use **interactive** TTY (`stdin_open` / `tty` are enabled in Compose) for first-time OAuth: the app prints the Twitch authorize URL to stdout; complete login in your browser. Published ports:
 
 | Port | Service |
 |------|---------|
 | **4343** | OAuth callback (must match `oauth_redirect_uri` port) |
-| **8765** | EventSub WebSocket broadcaster (`ws://localhost:8765/` from host) |
+| **8765** | EventSub WebSocket broadcaster (`ws://localhost:8765/` on same machine; `ws://<Pi-LAN-IP>:8765/` from a laptop) |
 | **5672** | RabbitMQ AMQP (`amqp://guest:guest@localhost:5672/` from host) |
 | **15672** | RabbitMQ management UI (optional) |
 
 Downstream apps on the host connect to **8765** and **5672** via `localhost`. Attach extra consumer containers to **`networks: [stream_tools]`** (see [`docker-compose.yml`](docker-compose.yml)) and use hostname **`rabbitmq`** for AMQP or **`twitch_eventsub`** for WebSockets (`8765`) without publishing ports on those consumers unless you need host access.
 
-To use an external broker instead of the bundled RabbitMQ, remove or stop the `rabbitmq` service, point [`docker/config/amqp_config.json`](./docker/config/amqp_config.json) at your broker, and drop `depends_on` / healthcheck coupling from `twitch_eventsub` in your own override file.
+To use an external broker instead of the bundled RabbitMQ, remove or stop the `rabbitmq` service, point [`config/docker/amqp_config.json`](./config/docker/amqp_config.json) at your broker, and drop `depends_on` / healthcheck coupling from `twitch_eventsub` in your own override file.
 
 ### Makefile and tests
 
@@ -123,4 +158,4 @@ make setup   # create .venv and pip install -r requirements-dev.txt
 make test    # pytest
 ```
 
-Set `TWITCH_DEBUG=1` for more verbose application logging.
+Set **`TWITCH_DEBUG=1`** for more verbose application logging. Set **`NO_LOGS=1`** to skip timestamped files under `logs/` (stderr only); see [`src/logger/app_logger.py`](src/logger/app_logger.py). Compose enables this by default on **`twitch_eventsub`** ([`docker-compose.yml`](docker-compose.yml)); use the same variable when running **`main.py`** locally. [`docker-entrypoint.sh`](docker-entrypoint.sh) respects `NO_LOGS` in the container.

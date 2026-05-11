@@ -46,15 +46,23 @@ class EventSubWebSocketBroadcaster:
         async def conn_handler(ws: ServerConnection) -> None:
             await self._connection_loop(ws)
 
+        bind_host = self._cfg.host
+        if bind_host in ("127.0.0.1", "localhost", "::1"):
+            self._logger.warning(
+                "websocket bound to %s — only this machine can connect; "
+                "set ws_config host to 0.0.0.0 for LAN/remote clients",
+                bind_host,
+            )
+
         async with serve(
             conn_handler,
-            self._cfg.host,
+            bind_host,
             self._cfg.port,
         ):
             self._logger.info(
                 "websocket eventsub sink listening ws://%s:%s/ "
                 "(broadcast worker starting)",
-                self._cfg.host,
+                bind_host,
                 self._cfg.port,
             )
             self._broadcast_worker_task = asyncio.create_task(self._broadcast_worker())

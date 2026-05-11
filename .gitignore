@@ -232,3 +232,5 @@ logs/
 
 # OAuth tokens (SQLite next to main.py)
 tokens.sqlite
+
+.env.compose

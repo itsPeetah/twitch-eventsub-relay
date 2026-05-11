@@ -34,15 +34,21 @@ class OAuthManager:
     def oauth_redirect_uri(self) -> str:
         return self.config.oauth_redirect_uri
 
-    def _oauth_listen_host_port(self) -> tuple[str, int]:
+    def _oauth_redirect_listen_port(self) -> int:
+        u = urllib.parse.urlparse(self.oauth_redirect_uri())
+        if u.port is not None:
+            return u.port
+        if u.scheme == "https":
+            return 443
+        return 80
+
+    def _oauth_listen_bind_host_port(self) -> tuple[str, int]:
+        override = self.config.oauth_callback_listen_host
+        port = self._oauth_redirect_listen_port()
+        if override:
+            return override.strip(), port
         u = urllib.parse.urlparse(self.oauth_redirect_uri())
         host = u.hostname or "localhost"
-        if u.port is not None:
-            port = u.port
-        elif u.scheme == "https":
-            port = 443
-        else:
-            port = 80
         return host, port
 
     def save_tokens(self, tokens):
@@ -113,6 +119,8 @@ class OAuthManager:
         }
         url = "https://id.twitch.tv/oauth2/authorize?" + urllib.parse.urlencode(params)
         self.logger.debug("authorize scopes=%s", list(self.config.scopes))
+        print("[*] Authorize URL (open in a browser if it did not open automatically):")
+        print(url)
         print("[*] Opening browser for authorization...")
         webbrowser.open(url)
 
@@ -165,7 +173,7 @@ class OAuthManager:
                 self.end_headers()
                 self.wfile.write(b"Authorized! You can close this tab.")
 
-        bind_host, bind_port = self._oauth_listen_host_port()
+        bind_host, bind_port = self._oauth_listen_bind_host_port()
         httpd = http.server.HTTPServer((bind_host, bind_port), Handler)
         log.info(
             "Listening on http://%s:%s for OAuth redirect_uri=%s",

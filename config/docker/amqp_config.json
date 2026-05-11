@@ -1,0 +1,4 @@
+{
+  "url": "amqp://guest:guest@rabbitmq:5672/",
+  "exchange": "twitch_eventsub"
+}

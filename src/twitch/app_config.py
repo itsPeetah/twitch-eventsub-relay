@@ -25,6 +25,7 @@ class TwitchAppConfig:
     oauth_redirect_uri: str
     scopes: tuple[str, ...]
     events: tuple[EventSubSubscription, ...]
+    oauth_callback_listen_host: str | None = None
 
 
 def _dotenv_path_for_config(json_path: Path) -> Path:
@@ -72,10 +73,18 @@ def load_twitch_app_config(
         for e in events_raw
     )
 
+    oauth_listen_raw = raw.get("oauth_callback_listen_host")
+    oauth_callback_listen_host: str | None
+    if oauth_listen_raw is None:
+        oauth_callback_listen_host = None
+    else:
+        oauth_callback_listen_host = str(oauth_listen_raw).strip() or None
+
     return TwitchAppConfig(
         client_id=client_id,
         client_secret=client_secret,
         oauth_redirect_uri=oauth_redirect_uri,
         scopes=tuple(scopes_raw),
         events=events,
+        oauth_callback_listen_host=oauth_callback_listen_host,
     )

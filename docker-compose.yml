@@ -1,0 +1,48 @@
+networks:
+  stream_tools:
+    driver: bridge
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    networks:
+      - stream_tools
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # RMQ UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  twitch_eventsub:
+    build: .
+    networks:
+      - stream_tools
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "4343:4343" # OAuth redirect
+      - "8765:8765" # WS Server
+    volumes:
+      - ./config/docker:/app/config:ro
+      - ./tokens.sqlite:/app/tokens.sqlite
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    environment:
+      TWITCH_DEBUG: "1"
+    stdin_open: true
+    tty: true
+    command: ["python", "main.py", "--use-rabbitmq", "--use-websockets"]
+
+volumes:
+  rabbitmq_data:

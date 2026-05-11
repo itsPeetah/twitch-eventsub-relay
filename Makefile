@@ -6,7 +6,7 @@ LOGS := logs
 
 .DEFAULT_GOAL := help
 
-.PHONY: help venv install install-dev setup test clean clean-logs
+.PHONY: help venv install install-dev setup test run clean clean-logs
 
 help:
 	@echo "Targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  install-dev  Install runtime + dev deps (requirements-dev.txt)"
 	@echo "  setup        Alias for install-dev"
 	@echo "  test         Run pytest (ensures install-dev first)"
+	@echo "  run          twitch_cli.py --use-rabbitmq --use-websockets (needs install once)"
 	@echo "  clean        Remove $(VENV)"
 	@echo "  clean-logs   Remove $(LOGS)/ (runtime log files)"
 
@@ -32,6 +33,9 @@ install-dev: $(PY)
 	$(PIP) install -r requirements-dev.txt
 
 setup: install-dev
+
+run: install
+	$(PY) twitch_cli.py --use-rabbitmq --use-websockets
 
 test: install-dev
 	$(PY) -m pytest tests/

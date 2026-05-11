@@ -2,6 +2,9 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/*
@@ -9,7 +12,7 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py .
+COPY twitch_cli.py .
 COPY src ./src
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
@@ -18,4 +21,5 @@ RUN chmod +x /docker-entrypoint.sh \
     && chown -R app:app /app
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["python", "main.py"]
+# Default CMD; docker-compose overrides with both transports enabled.
+CMD ["python", "twitch_cli.py"]

@@ -230,7 +230,7 @@ logs/
 
 .DS_Store
 
-# OAuth tokens (SQLite next to main.py)
+# OAuth tokens (SQLite next to twitch_cli.py)
 tokens.sqlite
 
 .env.compose

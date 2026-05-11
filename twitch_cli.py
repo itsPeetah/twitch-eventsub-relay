@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from aio_pika import ExchangeType
-
+from src.apps.plugins import DefaultEventSubSinkPlugin
 from src.core.amqp import load_amqp_config
 from src.core.aioloop import AppLifecycle
 from src.core.logger import AppLogger
+from src.core.plugins import EventSubPlugin
 from src.core.rabbit import RabbitAsyncPublisher
 from src.core.twitch import EventHandler
 from src.core.websockets import EventSubWebSocketBroadcaster, load_ws_config
@@ -16,8 +16,6 @@ from src.app import TwitchApp
 
 _APP_DIR = Path(__file__).resolve().parent
 _CONFIG_DIR = _APP_DIR / "config"
-
-_DEFAULT_PUBLISH_EXCHANGE = "twitch_eventsub"
 
 
 def print_eventsub_event(event_type: str, payload: object) -> None:
@@ -57,14 +55,6 @@ async def main() -> None:
             amqp_cfg,
             logger=app_log.sub("rabbitmq_sink"),
         )
-        rabbit.register_declare_job(_DEFAULT_PUBLISH_EXCHANGE, ExchangeType.TOPIC)
-        handlers.append(
-            EventHandler(
-                lambda et, pl: rabbit.publish_event(
-                    et, pl, exchange=_DEFAULT_PUBLISH_EXCHANGE
-                )
-            )
-        )
 
     if args.use_websockets:
         ws_cfg = load_ws_config(_CONFIG_DIR / "ws_config.json")
@@ -72,7 +62,9 @@ async def main() -> None:
             ws_cfg,
             logger=app_log.sub("websocket_server"),
         )
-        handlers.append(EventHandler(ws_broadcast.handle_event))
+
+    default_sink = DefaultEventSubSinkPlugin(ws_broadcast, rabbit)
+    handlers.extend(EventSubPlugin.as_event_handlers(default_sink))
 
     app = TwitchApp(
         config_path=_CONFIG_DIR / "twitch_config.json",

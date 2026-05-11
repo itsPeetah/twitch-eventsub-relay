@@ -3,13 +3,13 @@ WebSocket sink for EventSub: clients subscribe to arbitrary channel strings.
 
 Client → server (JSON text):
 
-- ``{"op": "subscribe", "channels": ["channel.chat.message", ...]}``
+- ``{"op": "subscribe", "channels": ["eventsub::channel.chat.message", ...]}`` (opaque strings; ``twitch_cli.py`` uses the ``eventsub::`` prefix via ``src.apps.plugins``.)
 - ``{"op": "unsubscribe", "channels": [...]}``
 - ``{"op": "list"}`` → server replies ``{"op": "list", "channels": [...]}``
 
 Server → client (notifications):
 
-- ``{"event_type": "<subscription_type>", "payload": ...}``
+- ``{"event_type": "<channel_string>", "payload": ...}`` (same string used for subscription routing, e.g. ``eventsub::channel.chat.message`` when using the default sink plugin.)
 
 Call :meth:`EventSubWebSocketBroadcaster.handle_event` from the same asyncio loop
 as :meth:`EventSubWebSocketBroadcaster.run` (matches Twitch EventSub integration).

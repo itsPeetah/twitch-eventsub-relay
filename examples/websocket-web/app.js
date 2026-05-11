@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const CHANNEL = "channel.chat.message";
+  /** Matches WEBSOCKET_CHANNEL_PREFIX + subscription type (see src/apps/plugins/default_sink.py). */
+  const CHANNEL = "eventsub::channel.chat.message";
 
   const elUrl = document.getElementById("ws-url");
   const elConnect = document.getElementById("btn-connect");

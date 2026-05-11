@@ -1,3 +1,6 @@
+# Full stack: RabbitMQ + twitch_cli (EventSub → RabbitMQ + WebSocket).
+# Copy env.compose.example → .env.compose and set TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET.
+
 networks:
   stream_tools:
     driver: bridge
@@ -5,6 +8,7 @@ networks:
 services:
   rabbitmq:
     image: rabbitmq:4-management-alpine
+    restart: unless-stopped
     networks:
       - stream_tools
     ports:
@@ -24,7 +28,10 @@ services:
       start_period: 15s
 
   twitch_eventsub:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
     networks:
       - stream_tools
     depends_on:
@@ -32,7 +39,7 @@ services:
         condition: service_healthy
     ports:
       # Explicit host IP so other machines (e.g. a laptop) can reach the Pi over LAN.
-      - "0.0.0.0:4343:4343" # OAuth redirect
+      - "0.0.0.0:4343:4343" # OAuth callback
       - "0.0.0.0:8765:8765" # WebSocket server
     volumes:
       - ./config/docker:/app/config:ro
@@ -40,12 +47,10 @@ services:
       - ./logs:/app/logs
     env_file:
       - .env.compose
-    environment:
-      TWITCH_DEBUG: "1"
-      NO_LOGS: "1"
     stdin_open: true
     tty: true
-    command: ["python", "main.py", "--use-rabbitmq", "--use-websockets"]
+    command:
+      ["python", "twitch_cli.py", "--use-rabbitmq", "--use-websockets"]
 
 volumes:
   rabbitmq_data:

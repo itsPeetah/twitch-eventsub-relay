@@ -93,6 +93,12 @@ class RabbitAsyncPublisher:
         """Queue an exchange declaration (default declare options). Runs after connect, or immediately if already connected."""
         job = DeclareJob(name=name, type=type)
         self._declare_job_queue.append(job)
+        self._logger.debug(
+            "rabbitmq queued declare job exchange=%r type=%s queue_depth=%s",
+            name,
+            type,
+            len(self._declare_job_queue),
+        )
         if self._connected:
             asyncio.create_task(self._drain_declare_jobs_locked())
 
@@ -103,7 +109,13 @@ class RabbitAsyncPublisher:
                 await self._run_declare_job(job)
 
     async def _run_declare_job(self, job: DeclareJob) -> None:
+        self._logger.info(
+            "rabbitmq declare_exchange exchange=%r type=%s",
+            job.name,
+            job.type,
+        )
         await self._client.declare_exchange(job.name, job.type)
+        self._logger.debug("rabbitmq declare_exchange finished exchange=%r", job.name)
 
     def publish_event(self, routing_key: str, payload: object, *, exchange: str) -> None:
         self._logger.debug("publishing routing_key=%s payload=%s", routing_key, payload)

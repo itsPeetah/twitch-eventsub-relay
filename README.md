@@ -12,6 +12,12 @@ Since I will use the notifications elsewhere and I am using RabbitMQ at work (al
 
 Implementation: [`src/core/rabbit/`](./src/core/rabbit/). Runnable samples: [`examples/README.md`](./examples/README.md).
 
+### Plugins
+
+[`src/core/plugins/`](./src/core/plugins/) defines [`EventSubPlugin`](./src/core/plugins/base.py): EventSub sinks that receive optional [`EventSubWebSocketBroadcaster`](./src/core/websockets/server.py) and [`RabbitAsyncPublisher`](./src/core/rabbit/publisher.py) plus optional RabbitMQ [`DeclareJob`](./src/core/rabbit/publisher.py) declarations.
+
+[`src/apps/plugins/`](./src/apps/plugins/) provides [`DefaultEventSubSinkPlugin`](./src/apps/plugins/default_sink.py), used by [`twitch_cli.py`](./twitch_cli.py): when RabbitMQ is enabled it registers the default topic exchange (`twitch_eventsub`); each notification is published (routing key = subscription type) and/or broadcast over WebSocket. WebSocket **subscription channels** are the EventSub type prefixed with **`eventsub::`** (see `WEBSOCKET_CHANNEL_PREFIX` in [`default_sink.py`](./src/apps/plugins/default_sink.py)) so clients subscribe to e.g. `eventsub::channel.chat.message`, not the raw Twitch type alone.
+
 ## Usage
 
 > Usage documentation was written by Cursor (and checked by me).
@@ -20,10 +26,10 @@ Implementation: [`src/core/rabbit/`](./src/core/rabbit/). Runnable samples: [`ex
 
 | What                    | Where                                             | Role                                                                                                                                        |
 | ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Primary application** | `[main.py](./main.py)` at the **repository root** | Twitch OAuth + EventSub; optional stdout, RabbitMQ, and WebSocket broadcaster via flags (see below).                                        |
-| **Example programs**    | [`examples/README.md`](./examples/README.md)      | Alternate entrypoints (their own `main.py` scripts) and small subscriber/publisher demos. They are **not** the same file as root `main.py`. |
+| **Primary application** | [`twitch_cli.py`](./twitch_cli.py) at the **repository root** | Twitch OAuth + EventSub; optional stdout, RabbitMQ, and WebSocket broadcaster via flags (see below).                                        |
+| **Downstream demos**      | [`examples/README.md`](./examples/README.md)                  | Small **standalone** Rabbit/WebSocket clients (no `src.*` imports)—copy or adapt for other apps.                                           |
 
-If docs say `python main.py`, that means the root file **after** `cd` to the repo root unless a path like `examples/rabbit-python/main.py` is given explicitly.
+Run the CLI from the repo root: `python twitch_cli.py ...`. Example scripts live under `examples/` (e.g. `examples/rabbit-python/rmq_example.py`).
 
 ### Installation
 
@@ -72,7 +78,7 @@ Start from `[config/examples/](./config/examples/)` (full Twitch sample: `[twitc
 
 #### WebSocket — `config/ws_config.json`
 
-For `main.py --use-websockets`. Use `"host": "0.0.0.0"` if clients are not on localhost.
+For `twitch_cli.py --use-websockets`. Use `"host": "0.0.0.0"` if clients are not on localhost.
 
 ```json
 {
@@ -83,18 +89,19 @@ For `main.py --use-websockets`. Use `"host": "0.0.0.0"` if clients are not on lo
 
 #### AMQP — `config/amqp_config.json`
 
-For `main.py --use-rabbitmq`. Optional `reconnect_*` fields control the initial broker connect loop; see `[amqp_config.example.json](./config/examples/amqp_config.example.json)`.
+For `twitch_cli.py --use-rabbitmq`. Optional `reconnect_*` fields control the initial broker connect loop; see `[amqp_config.example.json](./config/examples/amqp_config.example.json)`.
 
 ```json
 {
   "url": "amqp://guest:guest@localhost:5672/",
-  "exchange": "twitch_eventsub",
   "reconnect_delay": 1.0,
   "reconnect_backoff": 2.0,
   "reconnect_max_retries": null,
   "reconnect_max_delay": 60.0
 }
 ```
+
+Connection-only JSON (exchange names are declared in code—see [`DefaultEventSubSinkPlugin`](./src/apps/plugins/default_sink.py) / [`AmqpClient.declare_exchange`](./src/core/amqp/client.py)).
 
 ---
 
@@ -114,29 +121,29 @@ NO_LOGS=1 # log to stderr only, no files under `logs/`
 
 ---
 
-### Run natively (root `main.py`)
+### Run natively (`twitch_cli.py`)
 
-From the **repository root** (activate `.venv` if you use one). This is `[./main.py](./main.py)`, not the `main.py` files under `examples/`.
+From the **repository root** (activate `.venv` if you use one):
 
 ```bash
-python main.py
-python main.py --use-rabbitmq
-python main.py --use-websockets
-python main.py --use-rabbitmq --use-websockets
-python main.py --help
+python twitch_cli.py
+python twitch_cli.py --use-rabbitmq
+python twitch_cli.py --use-websockets
+python twitch_cli.py --use-rabbitmq --use-websockets
+python twitch_cli.py --help
 ```
 
-- **Default:** each EventSub notification is printed on stdout (JSON payload).
-- `--use-rabbitmq`: also publishes to RabbitMQ using `[config/amqp_config.json](./config/amqp_config.json)`.
+- **Default:** each EventSub notification is printed on stdout (JSON payload). A [`DefaultEventSubSinkPlugin`](./src/apps/plugins/default_sink.py) is always registered; if neither Rabbit nor WebSocket is enabled it no-ops for those transports.
+- `--use-rabbitmq`: connects and publishes to RabbitMQ using `[config/amqp_config.json](./config/amqp_config.json)` (topic exchange `twitch_eventsub`, routing key = subscription type).
   > Optional keys `**reconnect_delay**`, `**reconnect_backoff**`, `**reconnect_max_retries**` (`null` = retry until the broker is up), and `**reconnect_max_delay**` control the initial TCP connect loop in [`AmqpClient`](src/core/amqp/client.py) when RabbitMQ is not ready yet.
 - `--use-websockets`: also starts the WebSocket broadcaster using `[config/ws_config.json](./config/ws_config.json)`.
-  > Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting.
+  > Clients subscribe with JSON `{"op":"subscribe","channels":[...]}`. Channel strings use the **`eventsub::`** prefix plus the subscription type (e.g. `eventsub::channel.chat.message`).
 
 ### Docker Compose (full stack)
 
-RabbitMQ + `twitch_eventsub` running root `main.py --use-rabbitmq --use-websockets`. See `[docker-compose.yml](./docker-compose.yml)` (network `stream_tools`).
+RabbitMQ + `twitch_eventsub` running `twitch_cli.py --use-rabbitmq --use-websockets`. See `[docker-compose.yml](./docker-compose.yml)` (network `stream_tools`).
 
-**Setup:** Fill `[config/docker/](./config/docker/)` (see `[config/examples/*.docker.example.json](./config/examples/)`), `[.env](./.env)` from `[.env.example](./.env.example)` ([Environment variables](#environment-variables)), match the Twitch app redirect to `oauth_redirect_uri`, `touch tokens.sqlite`, then:
+**Setup:** Fill `[config/docker/](./config/docker/)` (see `[config/examples/*.docker.example.json](./config/examples/)`). For Compose credentials, copy [`env.compose.example`](./env.compose.example) to **`.env.compose`** (gitignored) and set `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` — `docker-compose.yml` loads it via **`env_file`**. Match the Twitch app redirect to `oauth_redirect_uri`, `touch tokens.sqlite`, then:
 
 > If you have ssh access to the machine you're running the containers on you can also copy the `tokens.sqlite` db file to it with `scp` after authenticating once from your work machine.
 
@@ -158,6 +165,7 @@ Published ports:
 ```bash
 make setup   # create .venv and pip install -r requirements-dev.txt
 make test    # pytest
+make run     # twitch_cli.py --use-rabbitmq --use-websockets (after make install)
 ```
 
 ---

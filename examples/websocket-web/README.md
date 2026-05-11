@@ -1,6 +1,6 @@
 # WebSocket chat viewer (vanilla)
 
-Small static page that connects to this repo’s **EventSub WebSocket broadcaster** (`EventSubWebSocketBroadcaster`), subscribes to `channel.chat.message`, and appends each message to the page.
+Small static page that connects to this repo’s **EventSub WebSocket broadcaster** (`EventSubWebSocketBroadcaster`), subscribes to **`eventsub::channel.chat.message`** (prefix matches [`DefaultEventSubSinkPlugin`](../../src/apps/plugins/default_sink.py) used by [`twitch_cli.py --use-websockets`](../../twitch_cli.py)), and appends each message to the page.
 
 Each row uses a **black background**, **white** message text, and the **login/display name** tinted with the **`color`** field from the Twitch payload.
 
@@ -9,10 +9,10 @@ Each row uses a **black background**, **white** message text, and the **login/di
 Run the Python broadcaster (from the repo root), e.g.:
 
 ```bash
-python examples/websocket-python/main.py
+python twitch_cli.py --use-websockets
 ```
 
-Or use `python main.py --use-websockets` with `config/ws_config.json` pointing at the same host/port as the URL in the page (default `ws://127.0.0.1:8765/`).
+(from the repo root, with `config/ws_config.json` matching the URL in the page—default `ws://127.0.0.1:8765/`). Subscription channels must include the `eventsub::` prefix for notifications to match (see app.js).
 
 ## Serving the files
 

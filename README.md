@@ -1,4 +1,4 @@
-# Mali's Overengineered Stream Tools
+# Mali's Overengineered Stream Tools (EventSub Router)
 
 ## Twitch OAuth and Eventsub Client
 

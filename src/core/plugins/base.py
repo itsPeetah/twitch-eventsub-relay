@@ -42,9 +42,6 @@ class EventSubPlugin(ABC):
     def handle(self, event_type: str, payload: object) -> None:
         """Called for each EventSub notification (same contract as other sinks)."""
 
-    def configure(self) -> None:
-        """Optional hook after construction; override for extra setup."""
-
     def publish_rabbit(self, routing_key: str, payload: object, *, exchange: str) -> None:
         """Publish via RabbitMQ if a publisher was injected; otherwise no-op."""
         if self._rabbit is not None:

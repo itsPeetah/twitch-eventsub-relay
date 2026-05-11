@@ -3,12 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Awaitable, Callable
 from typing import Any
 
 import aio_pika
 from aio_pika import ExchangeType
-from aio_pika.abc import AbstractExchange, AbstractIncomingMessage, AbstractRobustQueue
+from aio_pika.abc import AbstractExchange
 
 from .config import AmqpConfig
 
@@ -17,20 +16,16 @@ class AmqpClient:
     """
     Async AMQP session using ``aio_pika`` (non-blocking under asyncio).
 
-    Publisher helpers: :meth:`declare_exchange`, :meth:`declare_direct_exchange`,
-    :meth:`declare_fanout_exchange`, :meth:`declare_headers_exchange`,
-    :meth:`declare_topic_exchange`, :meth:`publish_json`.
-    Consumer helpers: :meth:`declare_queue`, :meth:`bind_queue`,
-    :meth:`set_qos_prefetch`, :meth:`basic_consume`.
+    Publisher helpers: :meth:`declare_exchange`, :meth:`publish_json`.
 
     Use one instance per asyncio loop; do not share across threads.
 
-    Logging is done by callers (e.g. :class:`~src.rabbit.RabbitAsyncPublisher`)
-    using the application logger from :class:`~src.logger.AppLogger`.
+    Logging is done by callers (e.g. :class:`~src.core.rabbit.RabbitAsyncPublisher`)
+    using the application logger from :class:`~src.core.logger.AppLogger`.
 
-    Initial TCP connect uses :attr:`~src.amqp.config.AmqpConfig.reconnect_delay`,
-    :attr:`~src.amqp.config.AmqpConfig.reconnect_backoff`, and
-    :attr:`~src.amqp.config.AmqpConfig.reconnect_max_retries` so startup can wait for
+    Initial TCP connect uses :attr:`~src.core.amqp.config.AmqpConfig.reconnect_delay`,
+    :attr:`~src.core.amqp.config.AmqpConfig.reconnect_backoff`, and
+    :attr:`~src.core.amqp.config.AmqpConfig.reconnect_max_retries` so startup can wait for
     the broker (``connect_robust`` still handles drops after the session is up).
     """
 
@@ -39,7 +34,6 @@ class AmqpClient:
         self._connection: aio_pika.RobustConnection | None = None
         self._channel: aio_pika.RobustChannel | None = None
         self._exchanges: dict[str, AbstractExchange] = {}
-        self._queues: dict[str, AbstractRobustQueue] = {}
 
     @property
     def config(self) -> AmqpConfig:
@@ -50,7 +44,6 @@ class AmqpClient:
             return
         await self._connect_with_retries()
         self._exchanges.clear()
-        self._queues.clear()
 
     async def _connect_with_retries(self) -> None:
         cfg = self._config
@@ -106,14 +99,11 @@ class AmqpClient:
         self._connection = None
         self._channel = None
         self._exchanges.clear()
-        self._queues.clear()
 
     def _require_channel(self) -> aio_pika.RobustChannel:
         if self._channel is None:
             raise RuntimeError("AmqpClient.connect() must be awaited first")
         return self._channel
-
-    # --- Publisher-oriented -------------------------------------------------
 
     async def declare_exchange(
         self,
@@ -140,87 +130,6 @@ class AmqpClient:
         self._exchanges[name] = ex
         return ex
 
-    async def declare_direct_exchange(
-        self,
-        name: str,
-        *,
-        durable: bool = True,
-        auto_delete: bool = False,
-        internal: bool = False,
-        passive: bool = False,
-        arguments: dict[str, Any] | None = None,
-    ) -> AbstractExchange:
-        return await self.declare_exchange(
-            name,
-            ExchangeType.DIRECT,
-            durable=durable,
-            auto_delete=auto_delete,
-            internal=internal,
-            passive=passive,
-            arguments=arguments,
-        )
-
-    async def declare_fanout_exchange(
-        self,
-        name: str,
-        *,
-        durable: bool = True,
-        auto_delete: bool = False,
-        internal: bool = False,
-        passive: bool = False,
-        arguments: dict[str, Any] | None = None,
-    ) -> AbstractExchange:
-        return await self.declare_exchange(
-            name,
-            ExchangeType.FANOUT,
-            durable=durable,
-            auto_delete=auto_delete,
-            internal=internal,
-            passive=passive,
-            arguments=arguments,
-        )
-
-    async def declare_headers_exchange(
-        self,
-        name: str,
-        *,
-        durable: bool = True,
-        auto_delete: bool = False,
-        internal: bool = False,
-        passive: bool = False,
-        arguments: dict[str, Any] | None = None,
-    ) -> AbstractExchange:
-        return await self.declare_exchange(
-            name,
-            ExchangeType.HEADERS,
-            durable=durable,
-            auto_delete=auto_delete,
-            internal=internal,
-            passive=passive,
-            arguments=arguments,
-        )
-
-    async def declare_topic_exchange(
-        self,
-        name: str,
-        *,
-        durable: bool = True,
-        auto_delete: bool = False,
-        internal: bool = False,
-        passive: bool = False,
-        arguments: dict[str, Any] | None = None,
-    ) -> AbstractExchange:
-        """Declare a topic exchange (idempotent). Returns the exchange handle."""
-        return await self.declare_exchange(
-            name,
-            ExchangeType.TOPIC,
-            durable=durable,
-            auto_delete=auto_delete,
-            internal=internal,
-            passive=passive,
-            arguments=arguments,
-        )
-
     async def publish_json(
         self,
         routing_key: str,
@@ -233,8 +142,7 @@ class AmqpClient:
         ex = self._exchanges.get(exchange)
         if ex is None:
             raise RuntimeError(
-                f"Exchange {exchange!r} is not declared; call declare_exchange "
-                f"(or declare_*_exchange) first"
+                f"Exchange {exchange!r} is not declared; call declare_exchange first"
             )
 
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -249,73 +157,3 @@ class AmqpClient:
             delivery_mode=delivery_mode,
         )
         await ex.publish(msg, routing_key=routing_key)
-
-    # --- Consumer-oriented --------------------------------------------------
-
-    async def declare_queue(
-        self,
-        queue: str,
-        *,
-        durable: bool = True,
-        exclusive: bool = False,
-        auto_delete: bool = False,
-    ) -> AbstractRobustQueue:
-        ch = self._require_channel()
-        q = await ch.declare_queue(
-            queue,
-            durable=durable,
-            exclusive=exclusive,
-            auto_delete=auto_delete,
-        )
-        self._queues[queue] = q
-        return q
-
-    async def bind_queue(
-        self,
-        queue: str,
-        routing_key: str,
-        *,
-        exchange: str,
-    ) -> None:
-        ex_obj = self._exchanges.get(exchange)
-        if ex_obj is None:
-            raise RuntimeError(
-                f"Exchange {exchange!r} is not declared; call declare_exchange "
-                f"(or declare_*_exchange) first"
-            )
-        q = self._queues.get(queue)
-        if q is None:
-            raise RuntimeError(
-                f"Queue {queue!r} is not declared; call declare_queue first"
-            )
-        await q.bind(ex_obj, routing_key=routing_key)
-
-    async def set_qos_prefetch(
-        self, prefetch_count: int, *, global_qos: bool = False
-    ) -> None:
-        await self._require_channel().set_qos(
-            prefetch_count=prefetch_count,
-            global_=global_qos,
-        )
-
-    async def basic_consume(
-        self,
-        queue: str,
-        on_message_callback: Callable[
-            [AbstractIncomingMessage],
-            Awaitable[object],
-        ],
-        *,
-        auto_ack: bool = False,
-        consumer_tag: str | None = None,
-    ) -> str:
-        q = self._queues.get(queue)
-        if q is None:
-            raise RuntimeError(
-                f"Queue {queue!r} is not declared; call declare_queue first"
-            )
-        return await q.consume(
-            on_message_callback,
-            no_ack=auto_ack,
-            consumer_tag=consumer_tag,
-        )

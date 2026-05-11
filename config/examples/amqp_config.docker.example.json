@@ -1,4 +1,8 @@
 {
   "url": "amqp://guest:guest@rabbitmq:5672/",
-  "exchange": "twitch_eventsub"
+  "exchange": "twitch_eventsub",
+  "reconnect_delay": 1.0,
+  "reconnect_backoff": 2.0,
+  "reconnect_max_retries": null,
+  "reconnect_max_delay": 60.0
 }

@@ -62,7 +62,7 @@ python main.py --help
 ```
 
 - **Default:** each EventSub notification is printed on stdout (JSON payload).
-- **`--use-rabbitmq`:** also publishes to RabbitMQ using [`config/amqp_config.json`](./config/amqp_config.json). Copy [config/examples/amqp_config.example.json](./config/examples/amqp_config.example.json) there and adjust broker URL / exchange as needed.
+- **`--use-rabbitmq`:** also publishes to RabbitMQ using [`config/amqp_config.json`](./config/amqp_config.json). Copy [config/examples/amqp_config.example.json](./config/examples/amqp_config.example.json) there and adjust broker URL / exchange as needed. Optional keys **`reconnect_delay`**, **`reconnect_backoff`**, **`reconnect_max_retries`** (`null` = retry until the broker is up), and **`reconnect_max_delay`** control the initial TCP connect loop in [`AmqpClient`](src/amqp/client.py) when RabbitMQ is not ready yet.
 - **`--use-websockets`:** also starts the WebSocket broadcaster using [`config/ws_config.json`](./config/ws_config.json). Copy [config/examples/ws_config.example.json](./config/examples/ws_config.example.json) there and adjust `host` / `port`. Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting. A minimal Python subscriber is [examples/websocket-python/subscriber_chat_message.py](./examples/websocket-python/subscriber_chat_message.py); a small browser UI lives under [examples/websocket-web/](./examples/websocket-web/) (see its README).
 
 ### Examples

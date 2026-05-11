@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from collections.abc import Awaitable, Callable
 
 import aio_pika
@@ -22,6 +24,11 @@ class AmqpClient:
 
     Logging is done by callers (e.g. :class:`~src.rabbit.RabbitAsyncPublisher`)
     using the application logger from :class:`~src.logger.AppLogger`.
+
+    Initial TCP connect uses :attr:`~src.amqp.config.AmqpConfig.reconnect_delay`,
+    :attr:`~src.amqp.config.AmqpConfig.reconnect_backoff`, and
+    :attr:`~src.amqp.config.AmqpConfig.reconnect_max_retries` so startup can wait for
+    the broker (``connect_robust`` still handles drops after the session is up).
     """
 
     def __init__(self, config: AmqpConfig) -> None:
@@ -42,10 +49,57 @@ class AmqpClient:
     async def connect(self) -> None:
         if self._connection is not None and not self._connection.is_closed:
             return
-        self._connection = await aio_pika.connect_robust(self._config.url)
-        self._channel = await self._connection.channel()
+        await self._connect_with_retries()
         self._exchanges.clear()
         self._queues.clear()
+
+    async def _connect_with_retries(self) -> None:
+        cfg = self._config
+        log = logging.getLogger(__name__)
+        delay = cfg.reconnect_delay
+        attempt = 0
+        last_exc: BaseException | None = None
+
+        while True:
+            attempt += 1
+            conn: aio_pika.RobustConnection | None = None
+            try:
+                conn = await aio_pika.connect_robust(cfg.url)
+                ch = await conn.channel()
+                self._connection = conn
+                self._channel = ch
+                if attempt > 1:
+                    log.info("amqp connected after %s failed attempt(s)", attempt - 1)
+                return
+            except BaseException as exc:
+                last_exc = exc
+                if conn is not None and not conn.is_closed:
+                    await conn.close()
+                if (
+                    cfg.reconnect_max_retries is not None
+                    and attempt >= 1 + cfg.reconnect_max_retries
+                ):
+                    log.error(
+                        "amqp connect failed after %s attempt(s); giving up",
+                        attempt,
+                    )
+                    assert last_exc is not None
+                    raise last_exc
+                wait_s = min(delay, cfg.reconnect_max_delay)
+                cap = (
+                    "unlimited"
+                    if cfg.reconnect_max_retries is None
+                    else str(1 + cfg.reconnect_max_retries)
+                )
+                log.warning(
+                    "amqp connect failed (attempt %s of %s max): %s; retrying in %.2fs",
+                    attempt,
+                    cap,
+                    exc,
+                    wait_s,
+                )
+                await asyncio.sleep(wait_s)
+                delay = min(delay * cfg.reconnect_backoff, cfg.reconnect_max_delay)
 
     async def close(self) -> None:
         if self._connection is not None and not self._connection.is_closed:

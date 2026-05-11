@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 @dataclass(frozen=True)
 class AmqpConfig:
     url: str
-    exchange: str
     #: Seconds to wait after a failed connect before the first retry.
     reconnect_delay: float = 1.0
     #: Multiply the wait after each subsequent failure (capped by ``reconnect_max_delay``).
@@ -30,11 +29,6 @@ def load_amqp_config(json_path: Path) -> AmqpConfig:
     url = str(raw.get("url", "")).strip()
     if not url:
         raise ValueError(f"{json_path} must include a non-empty 'url' string")
-
-    exchange_raw = raw.get("exchange", "twitch_eventsub")
-    exchange = str(exchange_raw).strip() if exchange_raw else "twitch_eventsub"
-    if not exchange:
-        exchange = "twitch_eventsub"
 
     reconnect_delay = _float_opt(raw, "reconnect_delay", 1.0, json_path, min_value=0.0)
     if reconnect_delay <= 0:
@@ -59,7 +53,6 @@ def load_amqp_config(json_path: Path) -> AmqpConfig:
 
     return AmqpConfig(
         url=url,
-        exchange=exchange,
         reconnect_delay=reconnect_delay,
         reconnect_backoff=reconnect_backoff,
         reconnect_max_retries=reconnect_max_retries,

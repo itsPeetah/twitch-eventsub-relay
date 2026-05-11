@@ -4,8 +4,8 @@ Like ``main.py``, but forwards EventSub notifications to RabbitMQ.
 Publishing uses asyncio + aio-pika: notifications are scheduled onto an
 :class:`asyncio.Queue` from the EventSub coroutine and drained by an async worker
 that awaits :meth:`AmqpClient.publish_json`, so the WebSocket loop never blocks on
-the broker. Only the configured topic exchange is declared; no queues or
-consumers are registered here.
+the broker. Declare exchanges yourself (e.g. on :attr:`~src.core.rabbit.RabbitAsyncPublisher.client`);
+no queues or consumers are registered here.
 
 SIGINT / SIGTERM (when supported) cancel :meth:`~src.rabbit.RabbitAsyncPublisher.run`
 and :meth:`TwitchApp.run`; :meth:`~src.rabbit.RabbitAsyncPublisher.close` drains
@@ -36,6 +36,8 @@ from src.app import TwitchApp
 
 _CONFIG_DIR = _PROJECT_ROOT / "config"
 
+_RABBIT_PUBLISH_EXCHANGE = "twitch_eventsub"
+
 
 async def main() -> None:
     app_log = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_rabbitmq")
@@ -48,7 +50,11 @@ async def main() -> None:
         config_path=_CONFIG_DIR / "twitch_config.json",
         token_db_path=_PROJECT_ROOT / "tokens.sqlite",
         logger=logger,
-        handlers=EventHandler(bridge.publish_event),
+        handlers=EventHandler(
+            lambda et, pl: bridge.publish_event(
+                et, pl, exchange=_RABBIT_PUBLISH_EXCHANGE
+            )
+        ),
     )
 
     async with AppLifecycle() as ctl:

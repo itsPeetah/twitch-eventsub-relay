@@ -43,7 +43,6 @@ def example_consumer_amqp_config() -> AmqpConfig:
     url = f"amqp://{user}:{password}@{host}:{port}/"
     return AmqpConfig(
         url=url,
-        exchange="twitch_eventsub",
         reconnect_delay=1.0,
         reconnect_backoff=2.0,
         reconnect_max_retries=None,
@@ -64,7 +63,7 @@ async def main() -> None:
     )
     async with AppLifecycle() as ctl:
         try:
-            await ctl.run_interruptible(consumer.run())
+            await ctl.run_interruptible(consumer.run(exchange="twitch_eventsub"))
         finally:
             await consumer.close()
 

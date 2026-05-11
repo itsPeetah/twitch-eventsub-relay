@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import aio_pika
 from aio_pika import ExchangeType
@@ -16,7 +17,9 @@ class AmqpClient:
     """
     Async AMQP session using ``aio_pika`` (non-blocking under asyncio).
 
-    Publisher helpers: :meth:`declare_topic_exchange`, :meth:`publish_json`.
+    Publisher helpers: :meth:`declare_exchange`, :meth:`declare_direct_exchange`,
+    :meth:`declare_fanout_exchange`, :meth:`declare_headers_exchange`,
+    :meth:`declare_topic_exchange`, :meth:`publish_json`.
     Consumer helpers: :meth:`declare_queue`, :meth:`bind_queue`,
     :meth:`set_qos_prefetch`, :meth:`basic_consume`.
 
@@ -41,10 +44,6 @@ class AmqpClient:
     @property
     def config(self) -> AmqpConfig:
         return self._config
-
-    @property
-    def default_exchange(self) -> str:
-        return self._config.exchange
 
     async def connect(self) -> None:
         if self._connection is not None and not self._connection.is_closed:
@@ -116,33 +115,126 @@ class AmqpClient:
 
     # --- Publisher-oriented -------------------------------------------------
 
-    async def declare_topic_exchange(
+    async def declare_exchange(
         self,
+        name: str,
+        exchange_type: ExchangeType | str,
         *,
-        exchange: str | None = None,
         durable: bool = True,
+        auto_delete: bool = False,
+        internal: bool = False,
+        passive: bool = False,
+        arguments: dict[str, Any] | None = None,
     ) -> AbstractExchange:
-        """Declare a topic exchange (idempotent). Returns the exchange handle."""
+        """Declare an exchange of any standard AMQP type (idempotent)."""
         ch = self._require_channel()
-        name = exchange if exchange is not None else self._config.exchange
-        ex = await ch.declare_exchange(name, ExchangeType.TOPIC, durable=durable)
+        ex = await ch.declare_exchange(
+            name,
+            exchange_type,
+            durable=durable,
+            auto_delete=auto_delete,
+            internal=internal,
+            passive=passive,
+            arguments=arguments,
+        )
         self._exchanges[name] = ex
         return ex
+
+    async def declare_direct_exchange(
+        self,
+        name: str,
+        *,
+        durable: bool = True,
+        auto_delete: bool = False,
+        internal: bool = False,
+        passive: bool = False,
+        arguments: dict[str, Any] | None = None,
+    ) -> AbstractExchange:
+        return await self.declare_exchange(
+            name,
+            ExchangeType.DIRECT,
+            durable=durable,
+            auto_delete=auto_delete,
+            internal=internal,
+            passive=passive,
+            arguments=arguments,
+        )
+
+    async def declare_fanout_exchange(
+        self,
+        name: str,
+        *,
+        durable: bool = True,
+        auto_delete: bool = False,
+        internal: bool = False,
+        passive: bool = False,
+        arguments: dict[str, Any] | None = None,
+    ) -> AbstractExchange:
+        return await self.declare_exchange(
+            name,
+            ExchangeType.FANOUT,
+            durable=durable,
+            auto_delete=auto_delete,
+            internal=internal,
+            passive=passive,
+            arguments=arguments,
+        )
+
+    async def declare_headers_exchange(
+        self,
+        name: str,
+        *,
+        durable: bool = True,
+        auto_delete: bool = False,
+        internal: bool = False,
+        passive: bool = False,
+        arguments: dict[str, Any] | None = None,
+    ) -> AbstractExchange:
+        return await self.declare_exchange(
+            name,
+            ExchangeType.HEADERS,
+            durable=durable,
+            auto_delete=auto_delete,
+            internal=internal,
+            passive=passive,
+            arguments=arguments,
+        )
+
+    async def declare_topic_exchange(
+        self,
+        name: str,
+        *,
+        durable: bool = True,
+        auto_delete: bool = False,
+        internal: bool = False,
+        passive: bool = False,
+        arguments: dict[str, Any] | None = None,
+    ) -> AbstractExchange:
+        """Declare a topic exchange (idempotent). Returns the exchange handle."""
+        return await self.declare_exchange(
+            name,
+            ExchangeType.TOPIC,
+            durable=durable,
+            auto_delete=auto_delete,
+            internal=internal,
+            passive=passive,
+            arguments=arguments,
+        )
 
     async def publish_json(
         self,
         routing_key: str,
         payload: object,
         *,
-        exchange: str | None = None,
+        exchange: str,
         persistent: bool = True,
     ) -> None:
         """Publish JSON as UTF-8 with ``content_type=application/json``."""
-        ex_name = exchange if exchange is not None else self._config.exchange
-        ex = self._exchanges.get(ex_name)
+        ex = self._exchanges.get(exchange)
         if ex is None:
             raise RuntimeError(
-                f"Exchange {ex_name!r} is not declared; call declare_topic_exchange first"
+                f"Exchange {exchange!r} is not declared; call declare_exchange "
+                f"(or declare_*_exchange) first"
             )
 
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -183,20 +275,20 @@ class AmqpClient:
         queue: str,
         routing_key: str,
         *,
-        exchange: str | None = None,
+        exchange: str,
     ) -> None:
-        ex_name = exchange if exchange is not None else self._config.exchange
-        ex = self._exchanges.get(ex_name)
-        if ex is None:
+        ex_obj = self._exchanges.get(exchange)
+        if ex_obj is None:
             raise RuntimeError(
-                f"Exchange {ex_name!r} is not declared; call declare_topic_exchange first"
+                f"Exchange {exchange!r} is not declared; call declare_exchange "
+                f"(or declare_*_exchange) first"
             )
         q = self._queues.get(queue)
         if q is None:
             raise RuntimeError(
                 f"Queue {queue!r} is not declared; call declare_queue first"
             )
-        await q.bind(ex, routing_key=routing_key)
+        await q.bind(ex_obj, routing_key=routing_key)
 
     async def set_qos_prefetch(
         self, prefetch_count: int, *, global_qos: bool = False

@@ -23,7 +23,7 @@ def _ephemeral_consumer_queue_name() -> str:
 
 class RabbitConsumer:
     """
-    AMQP consumer: declare exchange, queue, binding, then consume until cancelled.
+    AMQP consumer: declare queue, binding, then consume until cancelled.
 
     ``routing_key`` is the Twitch EventSub subscription type used when publishing
     to the topic exchange (same string as the publisher's routing key).
@@ -37,6 +37,9 @@ class RabbitConsumer:
 
     Incoming JSON bodies are pretty-printed to ``out_stream``; non-JSON payloads are
     written as raw text. Operational messages use ``logger``.
+
+    Call :meth:`AmqpClient.declare_exchange` (or a ``declare_*_exchange`` helper) on
+    :attr:`client` before :meth:`run` if the binding target does not already exist.
     """
 
     def __init__(
@@ -66,20 +69,24 @@ class RabbitConsumer:
         self._out_stream = out_stream if out_stream is not None else sys.stdout
         self._consume_started = False
 
-    async def run(self) -> None:
-        await self._ensure_started()
+    @property
+    def client(self) -> AmqpClient:
+        return self._client
+
+    async def run(self, *, exchange: str) -> None:
+        await self._ensure_started(exchange)
         await asyncio.Future()
 
-    async def _ensure_started(self) -> None:
+    async def _ensure_started(self, exchange: str) -> None:
         if self._consume_started:
             return
         self._logger.info(
             "rabbitmq consumer connecting broker=%s exchange=%r",
             redacted_amqp_url(self._client.config.url),
-            self._client.default_exchange,
+            exchange,
         )
         await self._client.connect()
-        await self._setup()
+        await self._setup(exchange)
         self._consume_started = True
 
     async def close(self) -> None:
@@ -87,14 +94,17 @@ class RabbitConsumer:
         await self._client.close()
         self._logger.info("rabbitmq consumer stopped")
 
-    async def _setup(self) -> None:
-        await self._client.declare_topic_exchange()
+    async def _setup(self, exchange: str) -> None:
         await self._client.declare_queue(
             self._queue_name,
             durable=self._queue_durable,
             auto_delete=self._queue_auto_delete,
         )
-        await self._client.bind_queue(self._queue_name, self._routing_key)
+        await self._client.bind_queue(
+            self._queue_name,
+            self._routing_key,
+            exchange=exchange,
+        )
         await self._client.set_qos_prefetch(self._prefetch_count)
 
         await self._client.basic_consume(
@@ -106,7 +116,7 @@ class RabbitConsumer:
             "rabbitmq consumer ready queue=%r exchange=%r routing_key=%r "
             "(cancel task to stop)",
             self._queue_name,
-            self._client.default_exchange,
+            exchange,
             self._routing_key,
         )
 

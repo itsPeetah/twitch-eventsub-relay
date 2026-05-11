@@ -44,7 +44,7 @@ async def main() -> None:
         config_path=_CONFIG_DIR / "twitch_config.json",
         token_db_path=_PROJECT_ROOT / "tokens.sqlite",
         logger=logger,
-        handler=EventHandler(bridge.publish_event),
+        handlers=EventHandler(bridge.publish_event),
     )
 
     async with AppLifecycle() as ctl:

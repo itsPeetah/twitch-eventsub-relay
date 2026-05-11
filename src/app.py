@@ -2,9 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
-from .twitch import EventHandler, OAuthManager, TwitchEventSub, load_twitch_app_config
+from .twitch import (
+    EventHandler,
+    OAuthManager,
+    TwitchEventSub,
+    combine_event_handlers,
+    load_twitch_app_config,
+    normalize_event_handlers,
+)
 
 
 class TwitchApp:
@@ -13,12 +21,12 @@ class TwitchApp:
         config_path: Path | str,
         token_db_path: Path | str,
         logger: logging.Logger,
-        handler: EventHandler,
+        handlers: EventHandler | Sequence[EventHandler],
     ):
         self.config_path = Path(config_path)
         self.token_db_path = Path(token_db_path)
         self.logger = logger
-        self.handler = handler
+        self.handlers: tuple[EventHandler, ...] = normalize_event_handlers(handlers)
 
     async def run(self) -> None:
         config = load_twitch_app_config(self.config_path)
@@ -30,7 +38,12 @@ class TwitchApp:
         )
 
         oauth = OAuthManager(config, self.logger, token_db=self.token_db_path)
-        twitch = TwitchEventSub(config, oauth, self.handler, self.logger)
+        event_handler = (
+            self.handlers[0]
+            if len(self.handlers) == 1
+            else combine_event_handlers(*self.handlers)
+        )
+        twitch = TwitchEventSub(config, oauth, event_handler, self.logger)
 
         await asyncio.gather(
             twitch.connect(),

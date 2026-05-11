@@ -1,4 +1,4 @@
-# Full stack: RabbitMQ + twitch_cli (EventSub → RabbitMQ + WebSocket).
+# Full stack: RabbitMQ + main.py (EventSub → RabbitMQ + WebSocket).
 # Copy env.compose.example → .env.compose and set TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET.
 
 networks:
@@ -50,7 +50,7 @@ services:
     stdin_open: true
     tty: true
     command:
-      ["python", "twitch_cli.py", "--use-rabbitmq", "--use-websockets"]
+      ["python", "main.py", "--use-rabbitmq", "--use-websockets"]
 
 volumes:
   rabbitmq_data:

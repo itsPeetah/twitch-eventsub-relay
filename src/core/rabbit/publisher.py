@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 from aio_pika import ExchangeType
 
-from ..amqp import AmqpClient, AmqpConfig
-from ..amqp.config import redacted_amqp_url
+from ..amqp.client import AmqpClient
+from ..amqp.config import AmqpConfig, redacted_amqp_url
 
 
 @dataclass(frozen=True)

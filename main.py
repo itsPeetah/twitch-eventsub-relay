@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from src.apps.plugins import DefaultEventSubSinkPlugin
+from src.apps.plugins import (
+    ChatRouterPlugin,
+    DefaultEventSubSinkPlugin,
+    RewardRouterPlugin,
+)
 from src.core.amqp import load_amqp_config
 from src.core.aioloop import AppLifecycle
 from src.core.logger import AppLogger
@@ -64,7 +68,11 @@ async def main() -> None:
         )
 
     default_sink = DefaultEventSubSinkPlugin(ws_broadcast, rabbit)
-    handlers.extend(EventSubPlugin.as_event_handlers(default_sink))
+    chat_router = ChatRouterPlugin(ws_broadcast, rabbit)
+    reward_router = RewardRouterPlugin(ws_broadcast, rabbit)
+    handlers.extend(
+        EventSubPlugin.as_event_handlers(default_sink, chat_router, reward_router)
+    )
 
     app = TwitchApp(
         config_path=_CONFIG_DIR / "twitch_config.json",

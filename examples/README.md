@@ -14,4 +14,7 @@ python examples/rabbit-python/rmq_example.py --help
 python examples/websocket-python/ws_example.py --help
 ```
 
-The browser demo [`websocket-web/`](./websocket-web/) pairs with the WebSocket server started by [`twitch_cli.py --use-websockets`](../twitch_cli.py) at the same host/port.
+Browser demos (serve over HTTP, see each folder’s README):
+
+- [`websocket-web/`](./websocket-web/) — chat-only viewer for `eventsub::channel.chat.message`.
+- [`websocket-web/plugins/`](./websocket-web/plugins/) — subscribe to all plugin channel patterns and inspect JSON payloads.

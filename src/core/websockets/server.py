@@ -3,7 +3,7 @@ WebSocket sink for EventSub: clients subscribe to arbitrary channel strings.
 
 Client → server (JSON text):
 
-- ``{"op": "subscribe", "channels": ["eventsub::channel.chat.message", ...]}`` (opaque strings; ``twitch_cli.py`` uses the ``eventsub::`` prefix via ``src.apps.plugins``.)
+- ``{"op": "subscribe", "channels": ["eventsub::channel.chat.message", ...]}`` (opaque strings; ``main.py`` uses the ``eventsub::`` prefix via ``src.apps.plugins``.)
 - ``{"op": "unsubscribe", "channels": [...]}``
 - ``{"op": "list"}`` → server replies ``{"op": "list", "channels": [...]}``
 

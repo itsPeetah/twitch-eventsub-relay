@@ -9,8 +9,8 @@ from typing import TextIO
 
 from aio_pika.abc import AbstractIncomingMessage
 
-from ..amqp import AmqpClient, AmqpConfig
-from ..amqp.config import redacted_amqp_url
+from ..amqp.client import AmqpClient
+from ..amqp.config import AmqpConfig, redacted_amqp_url
 
 DEFAULT_CHAT_ROUTING_KEY = "channel.chat.message"
 DEFAULT_CHAT_QUEUE_NAME = "twitch_eventsub.channel.chat.message"

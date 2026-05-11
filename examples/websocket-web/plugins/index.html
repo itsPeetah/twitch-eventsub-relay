@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebSocket plugins inspector</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <label>
+        WebSocket URL
+        <input
+          type="text"
+          id="ws-url"
+          value="ws://127.0.0.1:8765/"
+          spellcheck="false"
+        />
+      </label>
+      <button type="button" id="btn-connect">Connect</button>
+      <button type="button" id="btn-disconnect" disabled>Disconnect</button>
+      <span id="status" class="status" data-state="idle">Disconnected</span>
+    </header>
+
+    <section class="channels-panel" aria-label="Subscription channels">
+      <h2 class="panel-title">Channels</h2>
+      <p class="hint">
+        Matches <code>main.py --use-websockets</code> with
+        <code>DefaultEventSubSinkPlugin</code>, <code>ChatRouterPlugin</code>, and
+        <code>RewardRouterPlugin</code>. Toggle rows and add custom channels below,
+        then connect. While connected, use <strong>Apply subscriptions</strong> to
+        pick up textarea or checkbox changes without reconnecting.
+      </p>
+      <ul id="channel-checkboxes" class="channel-list"></ul>
+      <label class="extra-label">
+        Extra channels (one per line; commas OK except inside titles that contain them)
+        <textarea
+          id="extra-channels"
+          rows="3"
+          spellcheck="false"
+          placeholder="reward::redemptions::My Reward Title&#10;chat::commands::!mysfx"
+        ></textarea>
+      </label>
+      <div class="channel-actions">
+        <button type="button" id="btn-apply-subs" disabled>
+          Apply subscriptions
+        </button>
+      </div>
+    </section>
+
+    <main>
+      <h2 class="panel-title log-heading">Messages</h2>
+      <div
+        id="log"
+        class="log"
+        aria-live="polite"
+        aria-relevant="additions"
+      ></div>
+    </main>
+    <script src="app.js" defer></script>
+  </body>
+</html>

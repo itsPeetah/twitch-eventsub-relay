@@ -1,11 +1,5 @@
-from .default_sink import (
-    DEFAULT_PUBLISH_EXCHANGE,
-    WEBSOCKET_CHANNEL_PREFIX,
-    DefaultEventSubSinkPlugin,
-)
+from .chatrouter import ChatRouterPlugin
+from .default_sink import DefaultEventSubSinkPlugin
+from .rewardrouter import RewardRouterPlugin
 
-__all__ = [
-    "DEFAULT_PUBLISH_EXCHANGE",
-    "WEBSOCKET_CHANNEL_PREFIX",
-    "DefaultEventSubSinkPlugin",
-]
+__all__ = ["ChatRouterPlugin", "DefaultEventSubSinkPlugin", "RewardRouterPlugin"]

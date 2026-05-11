@@ -15,7 +15,7 @@ help:
 	@echo "  install-dev  Install runtime + dev deps (requirements-dev.txt)"
 	@echo "  setup        Alias for install-dev"
 	@echo "  test         Run pytest (ensures install-dev first)"
-	@echo "  run          twitch_cli.py --use-rabbitmq --use-websockets (needs install once)"
+	@echo "  run          main.py --use-rabbitmq --use-websockets (needs install once)"
 	@echo "  clean        Remove $(VENV)"
 	@echo "  clean-logs   Remove $(LOGS)/ (runtime log files)"
 
@@ -35,7 +35,7 @@ install-dev: $(PY)
 setup: install-dev
 
 run: install
-	$(PY) twitch_cli.py --use-rabbitmq --use-websockets
+	$(PY) main.py --use-rabbitmq --use-websockets
 
 test: install-dev
 	$(PY) -m pytest tests/

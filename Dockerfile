@@ -12,7 +12,7 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY twitch_cli.py .
+COPY main.py .
 COPY src ./src
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
@@ -22,4 +22,4 @@ RUN chmod +x /docker-entrypoint.sh \
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 # Default CMD; docker-compose overrides with both transports enabled.
-CMD ["python", "twitch_cli.py"]
+CMD ["python", "main.py"]

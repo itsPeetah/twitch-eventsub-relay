@@ -32,7 +32,7 @@ def load_twitch_app_config(
     *,
     dotenv_path: Path | None = None,
 ) -> TwitchAppConfig:
-    """Load ``config.json`` and credentials from ``.env`` (via python-dotenv)."""
+    """Load ``twitch_config.json`` and credentials from ``.env`` (via python-dotenv)."""
     env_path = dotenv_path if dotenv_path is not None else json_path.parent / ".env"
     load_dotenv(env_path)
 
@@ -50,10 +50,10 @@ def load_twitch_app_config(
     oauth_redirect_uri = raw.get("oauth_redirect_uri") or DEFAULT_OAUTH_REDIRECT_URI
     scopes_raw = raw.get("scopes")
     if not scopes_raw:
-        raise ValueError("config.json must include a non-empty 'scopes' array")
+        raise ValueError("twitch_config.json must include a non-empty 'scopes' array")
     events_raw = raw.get("events")
     if not events_raw:
-        raise ValueError("config.json must include a non-empty 'events' array")
+        raise ValueError("twitch_config.json must include a non-empty 'events' array")
 
     events = tuple(
         EventSubSubscription(

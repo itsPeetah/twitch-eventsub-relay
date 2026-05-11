@@ -16,7 +16,7 @@ def print_eventsub_event(event_type: str, payload: object) -> None:
 if __name__ == "__main__":
     logger = get_logger("twitch_authenticator", _APP_DIR / "twitch.log")
     app = TwitchApp(
-        config_path=_APP_DIR / "config.json",
+        config_path=_APP_DIR / "twitch_config.json",
         token_db_path=_APP_DIR / "tokens.sqlite",
         logger=logger,
         handler=EventHandler(print_eventsub_event),

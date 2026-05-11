@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Twitch chat (EventSub bridge)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <label>
+        WebSocket URL
+        <input type="text" id="ws-url" value="ws://127.0.0.1:8765/" spellcheck="false" />
+      </label>
+      <button type="button" id="btn-connect">Connect</button>
+      <button type="button" id="btn-disconnect" disabled>Disconnect</button>
+      <span id="status" class="status" data-state="idle">Disconnected</span>
+    </header>
+    <main>
+      <div id="chat" class="chat" aria-live="polite" aria-relevant="additions"></div>
+    </main>
+    <script src="app.js" defer></script>
+  </body>
+</html>

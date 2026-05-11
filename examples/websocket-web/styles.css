@@ -1,0 +1,119 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #111;
+  border-bottom: 1px solid #333;
+}
+
+.toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+#ws-url {
+  min-width: min(100vw - 2rem, 22rem);
+  padding: 0.35rem 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  background: #222;
+  border: 1px solid #444;
+  color: #ddd;
+  border-radius: 4px;
+}
+
+button {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  background: #333;
+  border: 1px solid #555;
+  color: #eee;
+  border-radius: 4px;
+}
+
+button:hover:not(:disabled) {
+  background: #444;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.status {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.status[data-state="idle"] {
+  background: #333;
+}
+
+.status[data-state="connecting"] {
+  background: #553800;
+}
+
+.status[data-state="open"] {
+  background: #14532d;
+}
+
+.status[data-state="error"] {
+  background: #7f1d1d;
+}
+
+main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.chat-line {
+  background: #000;
+  color: #fff;
+  padding: 0.5rem 0.65rem;
+  border-radius: 4px;
+  line-height: 1.35;
+}
+
+.chat-line .username {
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.chat-line .message-text {
+  color: #fff;
+  word-break: break-word;
+}

@@ -1,4 +1,4 @@
-# Twitch Authenticator
+# Mali's Overengineered Stream Tools
 
 ## Twitch OAuth and Eventsub Client
 
@@ -18,12 +18,10 @@ Implementation: [`src/rabbit/`](./src/rabbit/). Runnable samples: [`examples/REA
 
 **What to run**
 
-
 | What                    | Where                                             | Role                                                                                                                                        |
 | ----------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Primary application** | `[main.py](./main.py)` at the **repository root** | Twitch OAuth + EventSub; optional stdout, RabbitMQ, and WebSocket broadcaster via flags (see below).                                        |
-| **Example programs**    | [`examples/README.md`](./examples/README.md)     | Alternate entrypoints (their own `main.py` scripts) and small subscriber/publisher demos. They are **not** the same file as root `main.py`. |
-
+| **Example programs**    | [`examples/README.md`](./examples/README.md)      | Alternate entrypoints (their own `main.py` scripts) and small subscriber/publisher demos. They are **not** the same file as root `main.py`. |
 
 If docs say `python main.py`, that means the root file **after** `cd` to the repo root unless a path like `examples/rabbit-python/main.py` is given explicitly.
 
@@ -69,7 +67,6 @@ Start from `[config/examples/](./config/examples/)` (full Twitch sample: `[twitc
   ]
 }
 ```
-
 
 > Omit `oauth_callback_listen_host` on the desktop (bind follows `oauth_redirect_uri`). For Docker, add `"oauth_callback_listen_host": "0.0.0.0"` while keeping `oauth_redirect_uri` as registered with Twitch — see `[twitch_config.docker.example.json](./config/examples/twitch_config.docker.example.json)`.
 
@@ -131,9 +128,9 @@ python main.py --help
 
 - **Default:** each EventSub notification is printed on stdout (JSON payload).
 - `--use-rabbitmq`: also publishes to RabbitMQ using `[config/amqp_config.json](./config/amqp_config.json)`.
-> Optional keys `**reconnect_delay`**, `**reconnect_backoff**`, `**reconnect_max_retries**` (`null` = retry until the broker is up), and `**reconnect_max_delay**` control the initial TCP connect loop in `[AmqpClient](src/amqp/client.py)` when RabbitMQ is not ready yet.
+  > Optional keys `**reconnect_delay`**, `**reconnect_backoff**`, `**reconnect_max_retries**` (`null`= retry until the broker is up), and`**reconnect_max_delay\*\*`control the initial TCP connect loop in`[AmqpClient](src/amqp/client.py)` when RabbitMQ is not ready yet.
 - `--use-websockets`:also starts the WebSocket broadcaster using `[config/ws_config.json](./config/ws_config.json)`.
-> Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting.
+  > Clients choose which notification “channels” (opaque strings, typically Twitch subscription types such as `channel.chat.message`) to subscribe to after connecting.
 
 ### Docker Compose (full stack)
 
@@ -149,7 +146,6 @@ docker compose up --build
 
 Published ports:
 
-
 | Port      | Service                           |
 | --------- | --------------------------------- |
 | **4343**  | OAuth callback                    |
@@ -157,11 +153,9 @@ Published ports:
 | **5672**  | RabbitMQ AMQP                     |
 | **15672** | RabbitMQ management UI (optional) |
 
-
 ### Makefile and tests
 
 ```bash
 make setup   # create .venv and pip install -r requirements-dev.txt
 make test    # pytest
 ```
-

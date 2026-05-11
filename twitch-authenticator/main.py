@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from src import EventHandler, TwitchApp
+from src.aioloop import ShutdownLoop
 from src.logging_setup import get_logger
 
 _APP_DIR = Path(__file__).resolve().parent
@@ -13,7 +14,7 @@ def print_eventsub_event(event_type: str, payload: object) -> None:
     print(f"[event] {event_type} {json.dumps(payload, ensure_ascii=False)}")
 
 
-if __name__ == "__main__":
+async def main() -> None:
     logger = get_logger("twitch_authenticator", _APP_DIR / "twitch.log")
     app = TwitchApp(
         config_path=_APP_DIR / "twitch_config.json",
@@ -21,4 +22,9 @@ if __name__ == "__main__":
         logger=logger,
         handler=EventHandler(print_eventsub_event),
     )
-    asyncio.run(app.run())
+    async with ShutdownLoop() as ctl:
+        await ctl.race_with_shutdown(app.run())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

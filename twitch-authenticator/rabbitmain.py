@@ -7,18 +7,19 @@ that awaits :meth:`AmqpClient.publish_json`, so the WebSocket loop never blocks 
 the broker. Only the configured topic exchange is declared; no queues or
 consumers are registered here.
 
-SIGINT / SIGTERM (when supported) stop :meth:`TwitchApp.run`, drain the publish
-worker, and close the broker connection—same pattern as :mod:`rabbitconsumer`.
+SIGINT / SIGTERM (when supported) cancel :meth:`RabbitAsyncPublisher.run` and
+:meth:`TwitchApp.run`; :meth:`RabbitAsyncPublisher.close` drains the worker and
+closes the broker—same pattern as :mod:`rabbitconsumer`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import signal
 from pathlib import Path
 
 from src import AmqpClient, AmqpConfig, EventHandler, TwitchApp, load_amqp_config
+from src.aioloop import ShutdownLoop
 from src.logging_setup import get_logger
 
 _APP_DIR = Path(__file__).resolve().parent
@@ -27,18 +28,27 @@ _APP_DIR = Path(__file__).resolve().parent
 class RabbitAsyncPublisher:
     """
     Bridges sync :class:`EventHandler` callbacks into async publishes: each call
-    schedules a put on an :class:`asyncio.Queue`; :meth:`worker` awaits broker I/O.
+    schedules a put on an :class:`asyncio.Queue`; a background task drains the
+    queue and awaits :meth:`AmqpClient.publish_json`.
 
-    Call :meth:`setup` before starting :meth:`worker` (connects, declares the topic
-    exchange, logs readiness—same role as :meth:`RabbitConsumer._setup`).
+    :meth:`run` connects, declares the exchange, starts that worker, then blocks
+    until cancelled (same “long‑running session” shape as :meth:`TwitchApp.run`).
+    :meth:`close` cancels the worker and closes the AMQP client.
     """
 
     def __init__(self, amqp_config: AmqpConfig, *, logger: logging.Logger) -> None:
         self._client = AmqpClient(amqp_config)
         self._logger = logger
         self._queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
+        self._worker_task: asyncio.Task[None] | None = None
 
-    async def setup(self) -> None:
+    async def run(self) -> None:
+        await self._ensure_amqp_and_worker()
+        await asyncio.Future()
+
+    async def _ensure_amqp_and_worker(self) -> None:
+        if self._worker_task is not None:
+            return
         await self._client.connect()
         await self._client.declare_topic_exchange()
         self._logger.info(
@@ -46,8 +56,16 @@ class RabbitAsyncPublisher:
             "type=topic durable)",
             self._client.default_exchange,
         )
+        self._worker_task = asyncio.create_task(self._publish_worker())
 
     async def close(self) -> None:
+        if self._worker_task is not None:
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except asyncio.CancelledError:
+                pass
+            self._worker_task = None
         await self._client.close()
 
     def publish_event(self, event_type: str, payload: object) -> None:
@@ -66,7 +84,7 @@ class RabbitAsyncPublisher:
         except Exception:
             self._logger.exception("failed to enqueue message for RabbitMQ")
 
-    async def worker(self) -> None:
+    async def _publish_worker(self) -> None:
         while True:
             event_type, payload = await self._queue.get()
             try:
@@ -81,20 +99,7 @@ async def main() -> None:
     logger = get_logger("twitch_authenticator_rabbitmq", _APP_DIR / "twitch.log")
     amqp_cfg = load_amqp_config(_APP_DIR / "amqp_config.json")
 
-    shutdown = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    installed_signals: list[int] = []
-    for sig in (signal.SIGINT, getattr(signal, "SIGTERM", None)):
-        if sig is None:
-            continue
-        try:
-            loop.add_signal_handler(sig, shutdown.set)
-            installed_signals.append(sig)
-        except (NotImplementedError, RuntimeError, ValueError):
-            pass
-
     bridge = RabbitAsyncPublisher(amqp_cfg, logger=logger)
-    worker_task: asyncio.Task[None] | None = None
 
     app = TwitchApp(
         config_path=_APP_DIR / "twitch_config.json",
@@ -103,37 +108,16 @@ async def main() -> None:
         handler=EventHandler(bridge.publish_event),
     )
 
-    try:
-        await bridge.setup()
-        worker_task = asyncio.create_task(bridge.worker())
-
-        if installed_signals:
-            app_task = asyncio.create_task(app.run())
-            stop_task = asyncio.create_task(shutdown.wait())
-            done, pending = await asyncio.wait(
-                {app_task, stop_task},
-                return_when=asyncio.FIRST_COMPLETED,
+    async with ShutdownLoop() as ctl:
+        try:
+            await ctl.race_with_shutdown(
+                asyncio.gather(
+                    bridge.run(),
+                    app.run(),
+                )
             )
-            for t in pending:
-                t.cancel()
-            await asyncio.gather(app_task, stop_task, return_exceptions=True)
-            if not app_task.cancelled() and (exc := app_task.exception()):
-                raise exc
-        else:
-            await app.run()
-    finally:
-        if worker_task is not None:
-            worker_task.cancel()
-            try:
-                await worker_task
-            except asyncio.CancelledError:
-                pass
-        for sig in installed_signals:
-            try:
-                loop.remove_signal_handler(sig)
-            except (NotImplementedError, RuntimeError, ValueError):
-                pass
-        await bridge.close()
+        finally:
+            await bridge.close()
 
 
 if __name__ == "__main__":

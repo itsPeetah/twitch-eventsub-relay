@@ -3,19 +3,21 @@ Consume Twitch EventSub chat messages from RabbitMQ (asyncio + aio-pika).
 
 Declares a durable queue bound to the exchange from ``amqp_config.json`` with
 routing key ``channel.chat.message`` (topic exchange).
+
+Signal-driven shutdown is wired in :func:`main`, like :mod:`rabbitmain`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import signal
 import sys
 from pathlib import Path
 
 from aio_pika.abc import AbstractIncomingMessage
 
 from src import AmqpClient, AmqpConfig, load_amqp_config
+from src.aioloop import ShutdownLoop
 
 _APP_DIR = Path(__file__).resolve().parent
 
@@ -24,7 +26,7 @@ QUEUE_NAME = "twitch_eventsub.channel.chat.message"
 
 
 class RabbitConsumer:
-    """Bind a durable queue and run an async consume loop until cancelled."""
+    """AMQP consumer only: bind queue, subscribe, block until the task is cancelled."""
 
     def __init__(
         self,
@@ -44,32 +46,13 @@ class RabbitConsumer:
         amqp_cfg = load_amqp_config(self._amqp_config_path)
         self._client = AmqpClient(amqp_cfg)
         await self._client.connect()
+        await self._setup(amqp_cfg)
+        await asyncio.Future()
 
-        shutdown = asyncio.Event()
-        loop = asyncio.get_running_loop()
-        installed_signals: list[int] = []
-        for sig in (signal.SIGINT, getattr(signal, "SIGTERM", None)):
-            if sig is None:
-                continue
-            try:
-                loop.add_signal_handler(sig, shutdown.set)
-                installed_signals.append(sig)
-            except (NotImplementedError, RuntimeError, ValueError):
-                pass
-
-        try:
-            await self._setup(amqp_cfg)
-            if installed_signals:
-                await shutdown.wait()
-            else:
-                await asyncio.Future()
-        finally:
-            for sig in installed_signals:
-                try:
-                    loop.remove_signal_handler(sig)
-                except (NotImplementedError, RuntimeError, ValueError):
-                    pass
-            await self._shutdown()
+    async def close(self) -> None:
+        if self._client is not None:
+            await self._client.close()
+            self._client = None
 
     async def _setup(self, amqp_cfg: AmqpConfig) -> None:
         assert self._client is not None
@@ -98,15 +81,14 @@ class RabbitConsumer:
             except json.JSONDecodeError:
                 print(text, file=sys.stdout)
 
-    async def _shutdown(self) -> None:
-        if self._client is not None:
-            await self._client.close()
-            self._client = None
-
 
 async def main() -> None:
     consumer = RabbitConsumer(amqp_config_path=_APP_DIR / "amqp_config.json")
-    await consumer.run()
+    async with ShutdownLoop() as ctl:
+        try:
+            await ctl.race_with_shutdown(consumer.run())
+        finally:
+            await consumer.close()
 
 
 if __name__ == "__main__":

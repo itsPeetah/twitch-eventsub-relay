@@ -8,11 +8,13 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+from .app_config import TwitchAppConfig
+
 
 class OAuthManager:
     def __init__(
         self,
-        config,
+        config: TwitchAppConfig,
         logger: logging.Logger,
         token_file: str | Path = "tokens.json",
     ):
@@ -22,10 +24,7 @@ class OAuthManager:
         self.tokens = self.load_tokens()
 
     def oauth_redirect_uri(self) -> str:
-        return self.config.get(
-            "oauth_redirect_uri",
-            "http://localhost:4343/oauth/callback",
-        )
+        return self.config.oauth_redirect_uri
 
     def _oauth_listen_host_port(self) -> tuple[str, int]:
         u = urllib.parse.urlparse(self.oauth_redirect_uri())
@@ -63,7 +62,7 @@ class OAuthManager:
         )
 
     def _scopes_requested(self) -> frozenset[str]:
-        return frozenset(self.config.get("scopes", []))
+        return frozenset(self.config.scopes)
 
     def _scopes_granted_in_file(self) -> frozenset[str] | None:
         if not self.tokens or "scope" not in self.tokens:
@@ -118,14 +117,14 @@ class OAuthManager:
         redirect_uri = self.oauth_redirect_uri()
         state = secrets.token_hex(16)
         params = {
-            "client_id": self.config["client_id"],
+            "client_id": self.config.client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": " ".join(self.config["scopes"]),
+            "scope": " ".join(self.config.scopes),
             "state": state,
         }
         url = "https://id.twitch.tv/oauth2/authorize?" + urllib.parse.urlencode(params)
-        self.logger.debug("authorize scopes=%s", self.config.get("scopes"))
+        self.logger.debug("authorize scopes=%s", list(self.config.scopes))
         print("[*] Opening browser for authorization...")
         webbrowser.open(url)
 
@@ -200,8 +199,8 @@ class OAuthManager:
     def exchange_code(self, code):
         data = urllib.parse.urlencode(
             {
-                "client_id": self.config["client_id"],
-                "client_secret": self.config["client_secret"],
+                "client_id": self.config.client_id,
+                "client_secret": self.config.client_secret,
                 "code": code,
                 "grant_type": "authorization_code",
                 "redirect_uri": self.oauth_redirect_uri(),
@@ -218,8 +217,8 @@ class OAuthManager:
         print("[*] Refreshing access token...")
         data = urllib.parse.urlencode(
             {
-                "client_id": self.config["client_id"],
-                "client_secret": self.config["client_secret"],
+                "client_id": self.config.client_id,
+                "client_secret": self.config.client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": self.tokens["refresh_token"],
             }

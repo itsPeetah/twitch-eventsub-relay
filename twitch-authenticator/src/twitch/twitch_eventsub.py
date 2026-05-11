@@ -8,8 +8,9 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
-from .oauth_manager import OAuthManager
+from .app_config import EventSubSubscription, TwitchAppConfig
 from .event_handler import EventHandler
+from .oauth_manager import OAuthManager
 
 WS_FIN = 0x80
 WS_OP_CONT = 0x0
@@ -59,7 +60,7 @@ def _build_masked_frame(opcode: int, payload: bytes, fin: bool = True) -> bytes:
 class TwitchEventSub:
     def __init__(
         self,
-        config,
+        config: TwitchAppConfig,
         oauth: OAuthManager,
         event_handler: EventHandler,
         logger: logging.Logger,
@@ -251,28 +252,28 @@ class TwitchEventSub:
     async def subscribe_all_async(self):
         self.logger.debug(
             "subscribe_all_async: %d event(s) session_id=%s",
-            len(self.config.get("events", [])),
+            len(self.config.events),
             self.session_id,
         )
         token = await asyncio.to_thread(self.oauth.get_token)
         tasks = [
             asyncio.to_thread(self._subscribe_one, token, event)
-            for event in self.config["events"]
+            for event in self.config.events
         ]
         await asyncio.gather(*tasks)
 
-    def _subscribe_one(self, token: str, event: dict):
+    def _subscribe_one(self, token: str, event: EventSubSubscription):
         self.logger.debug(
             "eventsub POST subscribe type=%s version=%s condition=%s",
-            event.get("type"),
-            event.get("version"),
-            event.get("condition"),
+            event.type,
+            event.version,
+            event.condition,
         )
         body = json.dumps(
             {
-                "type": event["type"],
-                "version": event["version"],
-                "condition": event["condition"],
+                "type": event.type,
+                "version": event.version,
+                "condition": event.condition,
                 "transport": {
                     "method": "websocket",
                     "session_id": self.session_id,
@@ -284,7 +285,7 @@ class TwitchEventSub:
             "https://api.twitch.tv/helix/eventsub/subscriptions",
             data=body,
             headers={
-                "Client-ID": self.config["client_id"],
+                "Client-ID": self.config.client_id,
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             },
@@ -292,12 +293,12 @@ class TwitchEventSub:
         )
         try:
             with urllib.request.urlopen(req):
-                self.logger.info("Subscribed to %s", event["type"])
+                self.logger.info("Subscribed to %s", event.type)
         except urllib.error.HTTPError as e:
             err_body = e.read().decode(errors="replace")
             self.logger.error(
                 "subscribe failed type=%s HTTP %s: %s",
-                event["type"],
+                event.type,
                 e.code,
                 err_body,
             )

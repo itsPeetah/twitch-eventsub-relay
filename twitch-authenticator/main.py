@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from src import OAuthManager, TwitchEventSub, EventHandler
+from src import OAuthManager, TwitchEventSub, EventHandler, load_twitch_app_config
 
 _APP_DIR = Path(__file__).resolve().parent
 
@@ -24,7 +24,8 @@ Channel Routing: If an app connects to ws://localhost:8081/channel.chat.message,
 Twitch EventSub:
 Connects to Twitch’s EventSub WebSocket.
 Upon receiving the session_welcome message, it iterates through your config.json and sends POST requests to Twitch to link that session to the requested events.
-No External Libraries:
+Dependencies:
+python-dotenv for loading TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET from ``.env``.
 Uses urllib for API calls.
 Uses socket and asyncio for the raw WebSocket communication.
 Uses hashlib and base64 for the mandatory WebSocket security handshake.
@@ -38,13 +39,10 @@ Prerequisites
 Go to the Twitch Dev Console.
 Register an App.
 Set the Twitch app OAuth Redirect URL to match config oauth_redirect_uri (path included), e.g. http://localhost:4343/oauth/callback.
-Get your Client ID and Client Secret.
+Copy ``.env.example`` to ``.env`` and set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET (never commit ``.env``).
 The Configuration (config.json)
-Note: While you asked for YAML, Python does not have a YAML parser in its standard library. To keep this "no external libraries," I have used JSON, but I've included a tiny helper to read a YAML-like format if you prefer.
-Create a file named config.json:
+Create ``config.json`` beside ``main.py``:
 {
-    "client_id": "YOUR_CLIENT_ID",
-    "client_secret": "YOUR_CLIENT_SECRET",
     "oauth_redirect_uri": "http://localhost:4343/oauth/callback",
     "scopes": ["user:read:chat", "user:read:email", "chat:read", "chat:edit", "moderator:read:followers", "channel:read:subscriptions", "channel:read:redemptions"],
     "events": [
@@ -78,13 +76,12 @@ def print_eventsub_event(event_type: str, payload: object) -> None:
 
 async def main(logger: logging.Logger):
     config_path = _APP_DIR / "config.json"
-    with open(config_path, "r") as f:
-        config = json.load(f)
+    config = load_twitch_app_config(config_path)
 
     logger.debug(
         "loaded config: %d event subscription(s), scopes=%s",
-        len(config.get("events", [])),
-        config.get("scopes"),
+        len(config.events),
+        list(config.scopes),
     )
 
     oauth = OAuthManager(config, logger, token_file=_APP_DIR / "tokens.json")

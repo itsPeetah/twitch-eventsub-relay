@@ -1,3 +1,17 @@
-from .twitch import TwitchEventSub, OAuthManager, EventHandler
+from .twitch import (
+    EventHandler,
+    EventSubSubscription,
+    OAuthManager,
+    TwitchAppConfig,
+    TwitchEventSub,
+    load_twitch_app_config,
+)
 
-__all__ = ["OAuthManager", "TwitchEventSub", "EventHandler"]
+__all__ = [
+    "EventSubSubscription",
+    "OAuthManager",
+    "TwitchAppConfig",
+    "TwitchEventSub",
+    "EventHandler",
+    "load_twitch_app_config",
+]

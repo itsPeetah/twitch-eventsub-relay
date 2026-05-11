@@ -1,0 +1,44 @@
+{
+  "oauth_redirect_uri": "http://localhost:4343/oauth/callback",
+  "scopes": [
+    "user:read:chat",
+    "chat:read",
+    "chat:edit",
+    "moderator:read:followers",
+    "channel:read:subscriptions",
+    "channel:read:redemptions"
+  ],
+  "events": [
+    {
+      "type": "channel.chat.message",
+      "version": "1",
+      "condition": {
+        "broadcaster_user_id": "203116729",
+        "user_id": "203116729"
+      }
+    },
+    {
+      "type": "channel.follow",
+      "version": "2",
+      "condition": {
+        "broadcaster_user_id": "203116729",
+        "moderator_user_id": "203116729"
+      }
+    },
+    {
+      "type": "channel.subscribe",
+      "version": "1",
+      "condition": { "broadcaster_user_id": "203116729" }
+    },
+    {
+      "type": "channel.channel_points_custom_reward_redemption.add",
+      "version": "1",
+      "condition": { "broadcaster_user_id": "203116729" }
+    },
+    {
+      "type": "channel.channel_points_automatic_reward_redemption.add",
+      "version": "2",
+      "condition": { "broadcaster_user_id": "203116729" }
+    }
+  ]
+}

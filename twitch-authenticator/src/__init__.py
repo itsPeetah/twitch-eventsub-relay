@@ -1,3 +1,4 @@
+from .app import TwitchApp
 from .twitch import (
     EventHandler,
     EventSubSubscription,
@@ -9,9 +10,11 @@ from .twitch import (
 )
 
 __all__ = [
+    "EventHandler",
     "EventSubSubscription",
     "OAuthManager",
     "OAuthTokenDatabase",
+    "TwitchApp",
     "TwitchAppConfig",
     "TwitchEventSub",
     "EventHandler",

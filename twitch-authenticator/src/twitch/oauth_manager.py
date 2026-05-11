@@ -1,5 +1,6 @@
 import http.server
 import json
+import logging
 import secrets
 import time
 import urllib.parse
@@ -8,18 +9,23 @@ import webbrowser
 
 
 class OAuthManager:
-    def __init__(self, config):
+    def __init__(self, config, logger: logging.Logger):
         self.config = config
+        self.logger = logger
         self.token_file = "tokens.json"
         self.tokens = self.load_tokens()
 
     def load_tokens(self):
         try:
             with open(self.token_file, "r") as f:
-                return json.load(f)
+                tokens = json.load(f)
+                self.logger.debug("loaded tokens from %s", self.token_file)
+                return tokens
         except OSError:
+            self.logger.debug("no token file %s (yet)", self.token_file)
             return None
         except json.JSONDecodeError:
+            self.logger.debug("token file %s is invalid JSON", self.token_file)
             return None
 
     def save_tokens(self, tokens):
@@ -27,12 +33,30 @@ class OAuthManager:
         self.tokens["expires_at"] = time.time() + tokens["expires_in"]
         with open(self.token_file, "w") as f:
             json.dump(self.tokens, f)
+        self.logger.debug(
+            "saved tokens expires_at=%s (in %.0fs)",
+            self.tokens["expires_at"],
+            self.tokens["expires_at"] - time.time(),
+        )
 
     def get_token(self):
         if not self.tokens:
+            self.logger.debug("get_token: starting interactive authorize")
             self.authorize_manually()
-        if time.time() > self.tokens.get("expires_at", 0) - 60:
+        exp = self.tokens.get("expires_at", 0)
+        now = time.time()
+        if now > exp - 60:
+            self.logger.debug(
+                "get_token: refreshing (now=%.0f expires_at=%.0f)",
+                now,
+                exp,
+            )
             self.refresh_token()
+        else:
+            self.logger.debug(
+                "get_token: using cached access token (expires_at=%.0f)",
+                exp,
+            )
         return self.tokens["access_token"]
 
     def authorize_manually(self):
@@ -45,6 +69,7 @@ class OAuthManager:
             "state": state,
         }
         url = "https://id.twitch.tv/oauth2/authorize?" + urllib.parse.urlencode(params)
+        self.logger.debug("authorize scopes=%s", self.config.get("scopes"))
         print("[*] Opening browser for authorization...")
         webbrowser.open(url)
 
@@ -80,6 +105,7 @@ class OAuthManager:
         )
         with urllib.request.urlopen(req) as f:
             self.save_tokens(json.loads(f.read().decode()))
+        self.logger.debug("exchange_code: token exchange succeeded")
 
     def refresh_token(self):
         print("[*] Refreshing access token...")
@@ -96,3 +122,4 @@ class OAuthManager:
         )
         with urllib.request.urlopen(req) as f:
             self.save_tokens(json.loads(f.read().decode()))
+        self.logger.debug("refresh_token: succeeded")

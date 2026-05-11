@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import logging
 import secrets
 import ssl
 import urllib.error
@@ -17,6 +18,15 @@ WS_OP_BINARY = 0x2
 WS_OP_CLOSE = 0x8
 WS_OP_PING = 0x9
 WS_OP_PONG = 0xA
+
+_WS_OP_NAMES = {
+    WS_OP_CONT: "CONT",
+    WS_OP_TEXT: "TEXT",
+    WS_OP_BINARY: "BINARY",
+    WS_OP_CLOSE: "CLOSE",
+    WS_OP_PING: "PING",
+    WS_OP_PONG: "PONG",
+}
 
 
 def _parse_wss_url(url: str) -> tuple[str, int, str]:
@@ -47,14 +57,22 @@ def _build_masked_frame(opcode: int, payload: bytes, fin: bool = True) -> bytes:
 
 
 class TwitchEventSub:
-    def __init__(self, config, oauth: OAuthManager, event_handler: EventHandler):
+    def __init__(
+        self,
+        config,
+        oauth: OAuthManager,
+        event_handler: EventHandler,
+        logger: logging.Logger,
+    ):
         self.config = config
         self.oauth = oauth
         self.event_handler = event_handler
+        self.logger = logger
         self.session_id = None
 
     async def connect(self):
         url = "wss://eventsub.wss.twitch.tv/ws"
+        self.logger.debug("connect() starting with url=%s", url)
         while True:
             next_url = await self._connect_once(url)
             if next_url:
@@ -67,6 +85,7 @@ class TwitchEventSub:
         await asyncio.to_thread(self.oauth.get_token)
 
         host, port, path = _parse_wss_url(wss_url)
+        self.logger.debug("tcp+tls %s:%s path=%s", host, port, path)
         ctx = ssl.create_default_context()
         reader, writer = await asyncio.open_connection(
             host, port, ssl=ctx, server_hostname=host
@@ -91,6 +110,8 @@ class TwitchEventSub:
             writer.close()
             await writer.wait_closed()
             raise ConnectionError(f"WebSocket handshake failed: {first_line!r}")
+
+        self.logger.debug("websocket handshake ok: %s", first_line)
 
         fragment: bytes | None = None
 
@@ -122,7 +143,17 @@ class TwitchEventSub:
                 else:
                     payload = await reader.readexactly(length)
 
+                self.logger.debug(
+                    "ws frame fin=%s opcode=%s(%s) len=%s masked=%s",
+                    fin,
+                    opcode,
+                    _WS_OP_NAMES.get(opcode, "?"),
+                    len(payload),
+                    masked,
+                )
+
                 if opcode == WS_OP_PING:
+                    self.logger.debug("replying with pong len=%s", len(payload))
                     writer.write(_build_masked_frame(WS_OP_PONG, payload))
                     await writer.drain()
                     continue
@@ -170,7 +201,13 @@ class TwitchEventSub:
                 await writer.wait_closed()
 
     async def handle_message(self, msg: dict) -> str | None:
-        msg_type = msg.get("metadata", {}).get("message_type")
+        meta = msg.get("metadata", {})
+        msg_type = meta.get("message_type")
+        self.logger.debug(
+            "eventsub message_type=%s id=%s",
+            msg_type,
+            meta.get("message_id"),
+        )
 
         if msg_type == "session_welcome":
             self.session_id = msg["payload"]["session"]["id"]
@@ -181,6 +218,7 @@ class TwitchEventSub:
         if msg_type == "notification":
             event_type = msg["metadata"]["subscription_type"]
             event_data = msg["payload"]["event"]
+            self.logger.debug("notification subscription_version=%s", meta.get("subscription_version"))
             print(f"[Event] Received {event_type}")
             self.event_handler.handle_event(event_type, event_data)
             return None
@@ -198,9 +236,19 @@ class TwitchEventSub:
             )
             return None
 
+        if msg_type == "session_keepalive":
+            self.logger.debug("session_keepalive")
+            return None
+
+        self.logger.debug("unhandled eventsub message_type=%s", msg_type)
         return None
 
     async def subscribe_all_async(self):
+        self.logger.debug(
+            "subscribe_all_async: %d event(s) session_id=%s",
+            len(self.config.get("events", [])),
+            self.session_id,
+        )
         token = await asyncio.to_thread(self.oauth.get_token)
         tasks = [
             asyncio.to_thread(self._subscribe_one, token, event)
@@ -209,6 +257,12 @@ class TwitchEventSub:
         await asyncio.gather(*tasks)
 
     def _subscribe_one(self, token: str, event: dict):
+        self.logger.debug(
+            "eventsub POST subscribe type=%s version=%s condition=%s",
+            event.get("type"),
+            event.get("version"),
+            event.get("condition"),
+        )
         body = json.dumps(
             {
                 "type": event["type"],

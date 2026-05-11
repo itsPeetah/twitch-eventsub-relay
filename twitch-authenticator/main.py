@@ -2,8 +2,8 @@ import asyncio
 import base64
 import hashlib
 import json
-from typing import Dict, Set
-
+import logging
+import os
 from src import OAuthManager, TwitchEventSub, EventHandler
 
 """
@@ -63,13 +63,19 @@ def sha1_base64(data: str) -> str:
     return base64.b64encode(hash_obj.digest()).decode()
 
 
-async def main():
+async def main(logger: logging.Logger):
     with open("./config.json", "r") as f:
         config = json.load(f)
 
-    oauth = OAuthManager(config)
+    logger.debug(
+        "loaded config: %d event subscription(s), scopes=%s",
+        len(config.get("events", [])),
+        config.get("scopes"),
+    )
+
+    oauth = OAuthManager(config, logger)
     handler = EventHandler(lambda t, p: print("event type:", t, "event_payload:", p))
-    twitch = TwitchEventSub(config, oauth, handler)
+    twitch = TwitchEventSub(config, oauth, handler, logger)
 
     await asyncio.gather(
         twitch.connect(),
@@ -77,4 +83,12 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    logging.basicConfig(
+        filename="twitch.log",
+        filemode="w",
+        level=logging.DEBUG if os.environ.get("TWITCH_DEBUG") else logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
+
+    logger = logging.getLogger("twitch_authenticator")
+    asyncio.run(main(logger))

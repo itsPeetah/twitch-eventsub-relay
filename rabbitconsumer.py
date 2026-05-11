@@ -16,8 +16,8 @@ from pathlib import Path
 
 from aio_pika.abc import AbstractIncomingMessage
 
-from src import AmqpClient, AmqpConfig, load_amqp_config
-from src.aioloop import ShutdownLoop
+from core import AmqpClient, AmqpConfig, load_amqp_config
+from core.aioloop import ShutdownLoop
 
 _APP_DIR = Path(__file__).resolve().parent
 

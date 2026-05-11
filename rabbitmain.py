@@ -18,9 +18,9 @@ import asyncio
 import logging
 from pathlib import Path
 
-from src import AmqpClient, AmqpConfig, EventHandler, TwitchApp, load_amqp_config
-from src.aioloop import ShutdownLoop
-from src.logging_setup import get_logger
+from core import AmqpClient, AmqpConfig, EventHandler, TwitchApp, load_amqp_config
+from core.aioloop import ShutdownLoop
+from core.logging_setup import get_logger
 
 _APP_DIR = Path(__file__).resolve().parent
 

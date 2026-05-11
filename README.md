@@ -1,1 +1,1 @@
-# Malimore's Stream Tools
+# Twitch Authenticator

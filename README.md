@@ -159,3 +159,13 @@ Published ports:
 make setup   # create .venv and pip install -r requirements-dev.txt
 make test    # pytest
 ```
+
+---
+
+---
+
+## AI use disclaimer
+
+Some agentic AI tools (namely Cursor) was used to write the code for this repository, under strict vigilance and reviews by me. I am not a fan of using these tools but, as a professional software engineer, I also want to make sure I _can_ use them in case it becomes a requisite for my job and so I took on this project as a training opportunity.
+
+Before taking on this task I was convinced that these tools are not in a place where they can replace someone who knows what they're doing. As of writing this, I am even more convinced of this. While the code is for sure not perfect, getting it to a place where it's not a complete spaghetti cluster fuck took a lot of intent on my end and some strong steering of the slop machine.

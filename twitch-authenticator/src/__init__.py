@@ -1,4 +1,4 @@
-from .amqp_config import AmqpConfig, load_amqp_config
+from .amqp import AmqpClient, AmqpConfig, load_amqp_config
 from .app import TwitchApp
 from .twitch import (
     EventHandler,
@@ -11,6 +11,7 @@ from .twitch import (
 )
 
 __all__ = [
+    "AmqpClient",
     "AmqpConfig",
     "EventHandler",
     "EventSubSubscription",

@@ -1,127 +1,94 @@
 """
 Like ``main.py``, but forwards EventSub notifications to RabbitMQ.
 
-The AMQP side is **publisher-only**: it opens a connection, obtains a channel,
-and sends ``basic_publish``. It does **not** declare queues, bind queues, or
-call ``basic_consume`` / ``start_consuming`` — nothing listens for broker
-deliveries. On startup the client declares the configured exchange with
-``exchange_declare`` (idempotent: creates a durable topic exchange if missing);
-it does not declare queues or bindings.
+Publishing uses asyncio + aio-pika: notifications are scheduled onto an
+:class:`asyncio.Queue` from the EventSub coroutine and drained by an async worker
+that awaits :meth:`AmqpClient.publish_json`, so the WebSocket loop never blocks on
+the broker. Only the configured topic exchange is declared; no queues or
+consumers are registered here.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import queue
-import threading
 from pathlib import Path
-from typing import Any, cast
 
-import pika
-
-from src import EventHandler, TwitchApp, load_amqp_config
+from src import AmqpClient, AmqpConfig, EventHandler, TwitchApp, load_amqp_config
 from src.logging_setup import get_logger
 
 _APP_DIR = Path(__file__).resolve().parent
 
 
-class RabbitEventSink:
+class RabbitAsyncPublisher:
     """
-    Publisher-only RabbitMQ client: enqueues EventSub payloads for ``basic_publish``
-    on a worker thread so the asyncio EventSub loop stays non-blocking.
-    No consumption: no queues, bindings, or ``basic_consume``. Ensures the
-    outbound exchange exists via ``exchange_declare``, then only ``basic_publish``.
+    Bridges sync :class:`EventHandler` callbacks into async publishes: each call
+    schedules a put on an :class:`asyncio.Queue`; :meth:`worker` awaits broker I/O.
     """
 
-    _STOP = object()
-
-    def __init__(
-        self,
-        connection_url: str,
-        *,
-        exchange: str,
-        logger: logging.Logger,
-    ):
-        self._url = connection_url
-        self._exchange = exchange
+    def __init__(self, client: AmqpClient, *, logger: logging.Logger) -> None:
+        self._client = client
         self._logger = logger
-        self._q: queue.Queue[Any] = queue.Queue()
-        self._thread: threading.Thread | None = None
-
-    def start(self) -> None:
-        self._thread = threading.Thread(
-            target=self._worker,
-            name="rabbitmq-eventsub-sink",
-            daemon=True,
-        )
-        self._thread.start()
-
-    def _worker(self) -> None:
-        conn: pika.BlockingConnection | None = None
-        try:
-            conn = pika.BlockingConnection(pika.URLParameters(self._url))
-            ch = conn.channel()
-            ch.exchange_declare(
-                exchange=self._exchange,
-                exchange_type="topic",
-                durable=True,
-            )
-            self._logger.info(
-                "rabbitmq publisher ready (publish-only, exchange=%s type=topic durable)",
-                self._exchange,
-            )
-            while True:
-                item = self._q.get()
-                if item is self._STOP:
-                    break
-                event_type, payload = cast(tuple[str, object], item)
-                body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-                ch.basic_publish(
-                    exchange=self._exchange,
-                    routing_key=event_type,
-                    body=body,
-                    properties=pika.BasicProperties(
-                        content_type="application/json",
-                        delivery_mode=pika.DeliveryMode.Persistent,
-                    ),
-                )
-        except Exception:
-            self._logger.exception("rabbitmq worker failed")
-            raise
-        finally:
-            if conn is not None and conn.is_open:
-                conn.close()
+        self._queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
 
     def publish_event(self, event_type: str, payload: object) -> None:
         self._logger.debug("publishing event type=%s payload=%s", event_type, payload)
-        self._q.put((event_type, payload))
+        task = asyncio.create_task(self._enqueue(event_type, payload))
+        task.add_done_callback(self._log_enqueue_failure)
 
-    def stop(self) -> None:
-        self._q.put(self._STOP)
-        if self._thread is not None:
-            self._thread.join(timeout=10)
+    async def _enqueue(self, event_type: str, payload: object) -> None:
+        await self._queue.put((event_type, payload))
+
+    def _log_enqueue_failure(self, task: asyncio.Task[None]) -> None:
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            self._logger.exception("failed to enqueue message for RabbitMQ")
+
+    async def worker(self) -> None:
+        while True:
+            event_type, payload = await self._queue.get()
+            try:
+                await self._client.publish_json(event_type, payload)
+            except Exception:
+                self._logger.exception(
+                    "rabbitmq publish failed event_type=%s", event_type
+                )
 
 
-def main() -> None:
+async def main() -> None:
     logger = get_logger("twitch_authenticator_rabbitmq", _APP_DIR / "twitch.log")
-    amqp = load_amqp_config(_APP_DIR / "amqp_config.json")
+    amqp_cfg = load_amqp_config(_APP_DIR / "amqp_config.json")
 
-    sink = RabbitEventSink(amqp.url, exchange=amqp.exchange, logger=logger)
-    sink.start()
+    client = AmqpClient(amqp_cfg)
+    await client.connect()
+    await client.declare_topic_exchange()
+    logger.info(
+        "rabbitmq publisher ready (async publish-only, exchange=%s type=topic durable)",
+        client.default_exchange,
+    )
+
+    publisher = RabbitAsyncPublisher(client, logger=logger)
+    worker_task = asyncio.create_task(publisher.worker())
 
     app = TwitchApp(
         config_path=_APP_DIR / "twitch_config.json",
         token_db_path=_APP_DIR / "tokens.sqlite",
         logger=logger,
-        handler=EventHandler(sink.publish_event),
+        handler=EventHandler(publisher.publish_event),
     )
     try:
-        asyncio.run(app.run())
+        await app.run()
     finally:
-        sink.stop()
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        await client.close()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

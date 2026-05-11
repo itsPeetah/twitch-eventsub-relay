@@ -4,13 +4,18 @@ import hashlib
 import json
 import logging
 import os
+import sys
+from pathlib import Path
+
 from src import OAuthManager, TwitchEventSub, EventHandler
+
+_APP_DIR = Path(__file__).resolve().parent
 
 """
 How it works:
 OAuth Flow:
 It checks for a tokens.json. If missing, it opens your browser.
-It spins up a temporary http.server on port 8080 to grab the code after you click "Authorize."
+It spins up a temporary http.server on the host/port from config oauth_redirect_uri to grab the code after you click "Authorize."
 It handles token refreshing automatically by checking the expires_at timestamp before it expires.
 Internal WebSocket Server:
 Listens on ws://localhost:8081.
@@ -32,7 +37,7 @@ Below is a complete, robust solution.
 Prerequisites
 Go to the Twitch Dev Console.
 Register an App.
-Set the OAuth Redirect URL to http://localhost:8080.
+Set the Twitch app OAuth Redirect URL to match config oauth_redirect_uri (path included), e.g. http://localhost:4343/oauth/callback.
 Get your Client ID and Client Secret.
 The Configuration (config.json)
 Note: While you asked for YAML, Python does not have a YAML parser in its standard library. To keep this "no external libraries," I have used JSON, but I've included a tiny helper to read a YAML-like format if you prefer.
@@ -40,11 +45,14 @@ Create a file named config.json:
 {
     "client_id": "YOUR_CLIENT_ID",
     "client_secret": "YOUR_CLIENT_SECRET",
-    "scopes": ["chat:read", "chat:edit", "moderator:read:followers", "channel:read:subscriptions"],
+    "oauth_redirect_uri": "http://localhost:4343/oauth/callback",
+    "scopes": ["user:read:chat", "user:read:email", "chat:read", "chat:edit", "moderator:read:followers", "channel:read:subscriptions", "channel:read:redemptions"],
     "events": [
         {"type": "channel.chat.message", "version": "1", "condition": {"broadcaster_user_id": "YOUR_USER_ID", "user_id": "YOUR_USER_ID"}},
         {"type": "channel.follow", "version": "2", "condition": {"broadcaster_user_id": "YOUR_USER_ID", "moderator_user_id": "YOUR_USER_ID"}},
-        {"type": "channel.subscribe", "version": "1", "condition": {"broadcaster_user_id": "YOUR_USER_ID"}}
+        {"type": "channel.subscribe", "version": "1", "condition": {"broadcaster_user_id": "YOUR_USER_ID"}},
+        {"type": "channel.channel_points_custom_reward_redemption.add", "version": "1", "condition": {"broadcaster_user_id": "YOUR_USER_ID"}},
+        {"type": "channel.channel_points_automatic_reward_redemption.add", "version": "2", "condition": {"broadcaster_user_id": "YOUR_USER_ID"}}
     ]
 }
 
@@ -63,8 +71,14 @@ def sha1_base64(data: str) -> str:
     return base64.b64encode(hash_obj.digest()).decode()
 
 
+def print_eventsub_event(event_type: str, payload: object) -> None:
+    """Default business sink: print each EventSub notification to stdout."""
+    print(f"[event] {event_type} {json.dumps(payload, ensure_ascii=False)}")
+
+
 async def main(logger: logging.Logger):
-    with open("./config.json", "r") as f:
+    config_path = _APP_DIR / "config.json"
+    with open(config_path, "r") as f:
         config = json.load(f)
 
     logger.debug(
@@ -73,8 +87,8 @@ async def main(logger: logging.Logger):
         config.get("scopes"),
     )
 
-    oauth = OAuthManager(config, logger)
-    handler = EventHandler(lambda t, p: print("event type:", t, "event_payload:", p))
+    oauth = OAuthManager(config, logger, token_file=_APP_DIR / "tokens.json")
+    handler = EventHandler(print_eventsub_event)
     twitch = TwitchEventSub(config, oauth, handler, logger)
 
     await asyncio.gather(
@@ -82,13 +96,23 @@ async def main(logger: logging.Logger):
     )
 
 
-if __name__ == "__main__":
-    logging.basicConfig(
-        filename="twitch.log",
-        filemode="w",
-        level=logging.DEBUG if os.environ.get("TWITCH_DEBUG") else logging.INFO,
-        format="%(levelname)s %(name)s: %(message)s",
+def _configure_logging() -> None:
+    level = logging.DEBUG if os.environ.get("TWITCH_DEBUG") else logging.INFO
+    fmt = logging.Formatter("%(levelname)s %(name)s: %(message)s")
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.setLevel(level)
+    file_handler = logging.FileHandler(
+        _APP_DIR / "twitch.log", mode="w", encoding="utf-8"
     )
+    file_handler.setFormatter(fmt)
+    stream_handler = logging.StreamHandler(sys.stderr)
+    stream_handler.setFormatter(fmt)
+    root.addHandler(file_handler)
+    root.addHandler(stream_handler)
 
+
+if __name__ == "__main__":
+    _configure_logging()
     logger = logging.getLogger("twitch_authenticator")
     asyncio.run(main(logger))

@@ -6,14 +6,37 @@ import time
 import urllib.parse
 import urllib.request
 import webbrowser
+from pathlib import Path
 
 
 class OAuthManager:
-    def __init__(self, config, logger: logging.Logger):
+    def __init__(
+        self,
+        config,
+        logger: logging.Logger,
+        token_file: str | Path = "tokens.json",
+    ):
         self.config = config
         self.logger = logger
-        self.token_file = "tokens.json"
+        self.token_file = Path(token_file)
         self.tokens = self.load_tokens()
+
+    def oauth_redirect_uri(self) -> str:
+        return self.config.get(
+            "oauth_redirect_uri",
+            "http://localhost:4343/oauth/callback",
+        )
+
+    def _oauth_listen_host_port(self) -> tuple[str, int]:
+        u = urllib.parse.urlparse(self.oauth_redirect_uri())
+        host = u.hostname or "localhost"
+        if u.port is not None:
+            port = u.port
+        elif u.scheme == "https":
+            port = 443
+        else:
+            port = 80
+        return host, port
 
     def load_tokens(self):
         try:
@@ -39,7 +62,39 @@ class OAuthManager:
             self.tokens["expires_at"] - time.time(),
         )
 
+    def _scopes_requested(self) -> frozenset[str]:
+        return frozenset(self.config.get("scopes", []))
+
+    def _scopes_granted_in_file(self) -> frozenset[str] | None:
+        if not self.tokens or "scope" not in self.tokens:
+            return None
+        raw = self.tokens["scope"]
+        if isinstance(raw, list):
+            return frozenset(raw)
+        return frozenset(str(raw).split())
+
     def get_token(self):
+        if self.tokens:
+            granted = self._scopes_granted_in_file()
+            if granted is None:
+                self.logger.info(
+                    "cached token has no scope metadata; re-authorizing against config"
+                )
+                self.tokens = None
+                try:
+                    self.token_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            elif granted != self._scopes_requested():
+                self.logger.info(
+                    "OAuth scopes in config changed; discarding cached token and re-authorizing"
+                )
+                self.tokens = None
+                try:
+                    self.token_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
         if not self.tokens:
             self.logger.debug("get_token: starting interactive authorize")
             self.authorize_manually()
@@ -60,10 +115,11 @@ class OAuthManager:
         return self.tokens["access_token"]
 
     def authorize_manually(self):
+        redirect_uri = self.oauth_redirect_uri()
         state = secrets.token_hex(16)
         params = {
             "client_id": self.config["client_id"],
-            "redirect_uri": "http://localhost:8080",
+            "redirect_uri": redirect_uri,
             "response_type": "code",
             "scope": " ".join(self.config["scopes"]),
             "state": state,
@@ -74,20 +130,71 @@ class OAuthManager:
         webbrowser.open(url)
 
         code = None
+        oauth_error: tuple[str, str] | None = None
+        log = self.logger
 
         class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, _format, *_args):
+                pass
+
             def do_GET(self):
-                nonlocal code
-                query = urllib.parse.urlparse(self.path).query
-                code = urllib.parse.parse_qs(query).get("code", [None])[0]
+                nonlocal code, oauth_error
+                parsed = urllib.parse.urlparse(self.path)
+                if parsed.path == "/favicon.ico":
+                    self.send_response(204)
+                    self.end_headers()
+                    return
+                qs = urllib.parse.parse_qs(parsed.query)
+                err_list = qs.get("error")
+                if err_list:
+                    oauth_error = (
+                        err_list[0],
+                        qs.get("error_description", [""])[0],
+                    )
+                    log.error(
+                        "OAuth callback error=%s description=%s",
+                        oauth_error[0],
+                        urllib.parse.unquote_plus(oauth_error[1]),
+                    )
+                    self.send_response(400)
+                    self.end_headers()
+                    self.wfile.write(
+                        f"Twitch OAuth error: {oauth_error[0]}".encode()
+                    )
+                    return
+                code = qs.get("code", [None])[0]
+                if code:
+                    log.info(
+                        "OAuth redirect received on %s (authorization code chars=%s)",
+                        parsed.path or "/",
+                        len(code),
+                    )
+                else:
+                    log.warning(
+                        "OAuth callback GET without code (path=%s); waiting for redirect with ?code=",
+                        self.path,
+                    )
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b"Authorized! You can close this tab.")
 
-        httpd = http.server.HTTPServer(("localhost", 8080), Handler)
-        while not code:
+        bind_host, bind_port = self._oauth_listen_host_port()
+        httpd = http.server.HTTPServer((bind_host, bind_port), Handler)
+        log.info(
+            "Listening on http://%s:%s for OAuth redirect_uri=%s",
+            bind_host,
+            bind_port,
+            redirect_uri,
+        )
+        while code is None and oauth_error is None:
             httpd.handle_request()
         httpd.server_close()
+        if oauth_error:
+            raise RuntimeError(
+                f"OAuth failed: {oauth_error[0]} — "
+                f"{urllib.parse.unquote_plus(oauth_error[1])}"
+            )
+        log.info("Stopping OAuth callback server; exchanging authorization code for tokens")
         self.exchange_code(code)
 
     def exchange_code(self, code):
@@ -97,7 +204,7 @@ class OAuthManager:
                 "client_secret": self.config["client_secret"],
                 "code": code,
                 "grant_type": "authorization_code",
-                "redirect_uri": "http://localhost:8080",
+                "redirect_uri": self.oauth_redirect_uri(),
             }
         ).encode()
         req = urllib.request.Request(

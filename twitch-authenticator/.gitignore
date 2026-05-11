@@ -208,6 +208,9 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# OAuth tokens (stored next to main.py)
+tokens.json
+
 # PyPI configuration file
 .pypirc
 

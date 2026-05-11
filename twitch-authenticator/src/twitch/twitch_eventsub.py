@@ -76,7 +76,7 @@ class TwitchEventSub:
         while True:
             next_url = await self._connect_once(url)
             if next_url:
-                print("[*] Following session_reconnect…")
+                self.logger.info("following session_reconnect")
                 url = next_url
                 continue
             break
@@ -163,7 +163,7 @@ class TwitchEventSub:
                     code = 0
                     if len(payload) >= 2:
                         code = int.from_bytes(payload[:2], "big")
-                    print(f"[*] WebSocket closed by server (code {code})")
+                    self.logger.info("WebSocket closed by server (code %s)", code)
                     return None
 
                 if opcode == WS_OP_BINARY:
@@ -193,7 +193,7 @@ class TwitchEventSub:
                     await writer.wait_closed()
                     return reconnect
         except asyncio.IncompleteReadError:
-            print("[*] WebSocket connection closed (EOF)")
+            self.logger.info("WebSocket connection closed (EOF)")
             return None
         finally:
             if not writer.is_closing():
@@ -211,7 +211,7 @@ class TwitchEventSub:
 
         if msg_type == "session_welcome":
             self.session_id = msg["payload"]["session"]["id"]
-            print(f"[*] EventSub Connected. Session: {self.session_id}")
+            self.logger.info("EventSub connected session_id=%s", self.session_id)
             await self.subscribe_all_async()
             return None
 
@@ -219,20 +219,25 @@ class TwitchEventSub:
             event_type = msg["metadata"]["subscription_type"]
             event_data = msg["payload"]["event"]
             self.logger.debug("notification subscription_version=%s", meta.get("subscription_version"))
-            print(f"[Event] Received {event_type}")
+            self.logger.info(
+                "notification type=%s payload=%s",
+                event_type,
+                json.dumps(event_data, ensure_ascii=False),
+            )
             self.event_handler.handle_event(event_type, event_data)
             return None
 
         if msg_type == "session_reconnect":
             url = msg["payload"]["session"].get("reconnect_url")
-            print(f"[*] session_reconnect -> {url}")
+            self.logger.info("session_reconnect url=%s", url)
             return url
 
         if msg_type == "revocation":
             sub = msg["payload"]["subscription"]
-            print(
-                f"[!] Revoked subscription type={sub.get('type')} "
-                f"status={sub.get('status')}"
+            self.logger.warning(
+                "subscription revoked type=%s status=%s",
+                sub.get("type"),
+                sub.get("status"),
             )
             return None
 
@@ -287,6 +292,12 @@ class TwitchEventSub:
         )
         try:
             with urllib.request.urlopen(req):
-                print(f"[*] Subscribed to {event['type']}")
+                self.logger.info("Subscribed to %s", event["type"])
         except urllib.error.HTTPError as e:
-            print(f"[!] Error subscribing to {event['type']}: {e.read().decode()}")
+            err_body = e.read().decode(errors="replace")
+            self.logger.error(
+                "subscribe failed type=%s HTTP %s: %s",
+                event["type"],
+                e.code,
+                err_body,
+            )

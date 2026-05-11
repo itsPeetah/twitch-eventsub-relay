@@ -1,0 +1,4 @@
+{
+  "url": "amqp://guest:guest@localhost:5672/",
+  "exchange": "twitch_eventsub"
+}

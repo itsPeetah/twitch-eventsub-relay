@@ -208,9 +208,6 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
-# OAuth tokens (stored next to main.py)
-tokens.json
-
 # PyPI configuration file
 .pypirc
 
@@ -221,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+################## MY STUFF ##################
+
+# OAuth tokens (stored next to main.py)
+tokens.json

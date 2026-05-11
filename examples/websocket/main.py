@@ -28,10 +28,11 @@ _CONFIG_DIR = _PROJECT_ROOT / "config"
 
 
 async def main() -> None:
-    logger = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_websocket")
+    app_log = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_websocket")
+    logger = app_log.logger
     ws_cfg = load_ws_config(_CONFIG_DIR / "ws_config.json")
 
-    bridge = EventSubWebSocketBroadcaster(ws_cfg, logger=logger)
+    bridge = EventSubWebSocketBroadcaster(ws_cfg, logger=app_log.sub("websockets"))
 
     app = TwitchApp(
         config_path=_CONFIG_DIR / "twitch_config.json",

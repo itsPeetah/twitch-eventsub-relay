@@ -35,10 +35,11 @@ _CONFIG_DIR = _PROJECT_ROOT / "config"
 
 
 async def main() -> None:
-    logger = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_rabbitmq")
+    app_log = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_rabbitmq")
+    logger = app_log.logger
     amqp_cfg = load_amqp_config(_CONFIG_DIR / "amqp_config.json")
 
-    bridge = RabbitAsyncPublisher(amqp_cfg, logger=logger)
+    bridge = RabbitAsyncPublisher(amqp_cfg, logger=app_log.sub("rabbitmq"))
 
     app = TwitchApp(
         config_path=_CONFIG_DIR / "twitch_config.json",

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+import pytest
+
 from src.logger import AppLogger
 
 
@@ -28,11 +30,33 @@ def test_app_logger_stem_override(tmp_path_factory) -> None:
     assert cfg.log_path.read_text(encoding="utf-8").strip().endswith("x")
 
 
-def test_app_logger_create_returns_configured_logger(tmp_path_factory) -> None:
+def test_app_logger_create_returns_facade(tmp_path_factory) -> None:
     proj = tmp_path_factory.mktemp("proj")
-    logger = AppLogger.create(proj, name="via_create")
-    assert logger.name == "via_create"
-    assert len(logger.handlers) == 2
+    cfg = AppLogger.create(proj, name="via_create")
+    assert cfg.logger.name == "via_create"
+    assert len(cfg.logger.handlers) == 2
+
+
+def test_app_logger_sub_shares_output_distinct_names(tmp_path_factory) -> None:
+    proj = tmp_path_factory.mktemp("proj")
+    cfg = AppLogger.create(proj, name="base_app")
+    child = cfg.sub("websockets")
+    assert child.name == "base_app.websockets"
+    assert child.propagate is True
+    assert len(child.handlers) == 0
+
+    cfg.logger.info("from_base")
+    child.info("from_ws")
+
+    text = cfg.log_path.read_text(encoding="utf-8")
+    assert "base_app:" in text
+    assert "base_app.websockets:" in text
+
+
+def test_app_logger_sub_rejects_empty_suffix(tmp_path_factory) -> None:
+    cfg = AppLogger.create(tmp_path_factory.mktemp("proj"), name="x")
+    with pytest.raises(ValueError):
+        cfg.sub("")
 
 
 def test_app_logger_does_not_mutate_root(tmp_path_factory) -> None:

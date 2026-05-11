@@ -2,10 +2,11 @@ PYTHON ?= python3
 VENV := .venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
+LOGS := logs
 
 .DEFAULT_GOAL := help
 
-.PHONY: help venv install install-dev setup test clean
+.PHONY: help venv install install-dev setup test clean clean-logs
 
 help:
 	@echo "Targets:"
@@ -15,6 +16,7 @@ help:
 	@echo "  setup        Alias for install-dev"
 	@echo "  test         Run pytest (ensures install-dev first)"
 	@echo "  clean        Remove $(VENV)"
+	@echo "  clean-logs   Remove $(LOGS)/ (runtime log files)"
 
 venv: $(PY)
 
@@ -36,3 +38,6 @@ test: install-dev
 
 clean:
 	rm -rf $(VENV)
+
+clean-logs:
+	rm -rf $(LOGS)

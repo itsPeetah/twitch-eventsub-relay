@@ -19,6 +19,9 @@ class AmqpClient:
     :meth:`set_qos_prefetch`, :meth:`basic_consume`.
 
     Use one instance per asyncio loop; do not share across threads.
+
+    Logging is done by callers (e.g. :class:`~src.rabbitmq.RabbitAsyncPublisher`)
+    using the application logger from :class:`~src.logger.AppLogger`.
     """
 
     def __init__(self, config: AmqpConfig) -> None:

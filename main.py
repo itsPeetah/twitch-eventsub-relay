@@ -43,7 +43,8 @@ def _parse_args() -> argparse.Namespace:
 
 async def main() -> None:
     args = _parse_args()
-    logger = AppLogger.create(_APP_DIR, name="twitch_authenticator")
+    app_log = AppLogger.create(_APP_DIR, name="twitch_client")
+    logger = app_log.logger
 
     handlers: list[EventHandler] = [EventHandler(print_eventsub_event)]
     rabbit: RabbitAsyncPublisher | None = None
@@ -51,12 +52,18 @@ async def main() -> None:
 
     if args.use_rabbitmq:
         amqp_cfg = load_amqp_config(_CONFIG_DIR / "amqp_config.json")
-        rabbit = RabbitAsyncPublisher(amqp_cfg, logger=logger)
+        rabbit = RabbitAsyncPublisher(
+            amqp_cfg,
+            logger=app_log.sub("rabbitmq_sink"),
+        )
         handlers.append(EventHandler(rabbit.publish_event))
 
     if args.use_websockets:
         ws_cfg = load_ws_config(_CONFIG_DIR / "ws_config.json")
-        ws_broadcast = EventSubWebSocketBroadcaster(ws_cfg, logger=logger)
+        ws_broadcast = EventSubWebSocketBroadcaster(
+            ws_cfg,
+            logger=app_log.sub("websocket_server"),
+        )
         handlers.append(EventHandler(ws_broadcast.handle_event))
 
     app = TwitchApp(

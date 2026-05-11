@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
@@ -26,3 +27,16 @@ def load_amqp_config(json_path: Path) -> AmqpConfig:
         exchange = "twitch_eventsub"
 
     return AmqpConfig(url=url, exchange=exchange)
+
+
+def redacted_amqp_url(url: str) -> str:
+    """Broker endpoint without credentials (safe for application logs)."""
+    try:
+        p = urlparse(url)
+        host = p.hostname or ""
+        port = p.port
+        if port is not None:
+            return f"{p.scheme}://{host}:{port}/"
+        return f"{p.scheme}://{host}/"
+    except Exception:
+        return "<amqp>"

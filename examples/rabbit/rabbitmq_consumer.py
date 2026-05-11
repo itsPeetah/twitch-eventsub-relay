@@ -29,9 +29,9 @@ _CONFIG_DIR = _PROJECT_ROOT / "config"
 
 
 async def main() -> None:
-    logger = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_rabbit_consumer")
+    app_log = AppLogger.create(_PROJECT_ROOT, name="twitch_authenticator_rabbit_consumer")
     amqp_cfg = load_amqp_config(_CONFIG_DIR / "amqp_config.json")
-    consumer = RabbitConsumer(amqp_cfg, logger=logger)
+    consumer = RabbitConsumer(amqp_cfg, logger=app_log.sub("consumer"))
     async with AppLifecycle() as ctl:
         try:
             await ctl.run_interruptible(consumer.run())

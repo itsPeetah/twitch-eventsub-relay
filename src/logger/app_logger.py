@@ -14,8 +14,12 @@ class AppLogger:
     ``name`` is the ``logging`` logger name; ``stem`` selects the filename suffix
     (defaults to ``name``).
 
-    Use :meth:`create` when you only need a configured :class:`logging.Logger`.
-    Construct ``AppLogger(...)`` directly when you also need :attr:`log_path`.
+    Handlers live only on :attr:`logger`. Call :meth:`sub` to get descendant
+    loggers whose records propagate there so ``%(name)s`` differs while the output
+    file stays the same.
+
+    Use :meth:`create` for the usual entrypoint (returns ``AppLogger``). Access
+    :attr:`logger` for the base record name (e.g. Twitch stack).
     """
 
     log_path: Path
@@ -28,9 +32,27 @@ class AppLogger:
         *,
         name: str,
         stem: str | None = None,
-    ) -> logging.Logger:
-        """Configure logging and return the stdlib logger (one-step for callers)."""
-        return cls(project_root, name=name, stem=stem).logger
+    ) -> AppLogger:
+        """Configure logging and return this facade (use :attr:`logger` / :meth:`sub`)."""
+        return cls(project_root, name=name, stem=stem)
+
+    def sub(self, suffix: str) -> logging.Logger:
+        """
+        Named child logger under the base :attr:`logger` hierarchy.
+
+        Shares the same file and stderr output; messages show ``suffix`` in the
+        logger name (e.g. ``myapp.websockets``). ``suffix`` may contain dots
+        (``rabbit.publisher``).
+        """
+        part = suffix.strip().strip(".")
+        if not part:
+            raise ValueError("sub logger suffix must be non-empty")
+        full_name = f"{self.logger.name}.{part}"
+        child = logging.getLogger(full_name)
+        child.handlers.clear()
+        child.propagate = True
+        child.setLevel(self.logger.level)
+        return child
 
     def __init__(
         self,

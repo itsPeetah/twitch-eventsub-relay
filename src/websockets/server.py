@@ -52,7 +52,8 @@ class EventSubWebSocketBroadcaster:
             self._cfg.port,
         ):
             self._logger.info(
-                "websocket eventsub sink listening ws://%s:%s/",
+                "websocket eventsub sink listening ws://%s:%s/ "
+                "(broadcast worker starting)",
                 self._cfg.host,
                 self._cfg.port,
             )
@@ -117,15 +118,15 @@ class EventSubWebSocketBroadcaster:
 
     async def _connection_loop(self, ws: ServerConnection) -> None:
         peer = ws.remote_address
-        self._logger.debug("websocket client connected %s", peer)
+        self._logger.info("websocket client connected peer=%s", peer)
         try:
             async for raw in ws:
                 await self._dispatch_client_message(ws, raw)
         except Exception:
-            self._logger.debug("websocket client disconnected %s", peer, exc_info=True)
+            self._logger.debug("websocket client recv ended peer=%s", peer, exc_info=True)
         finally:
             self._registry.remove_connection(ws)
-            self._logger.debug("websocket client cleanup %s", peer)
+            self._logger.info("websocket client disconnected peer=%s", peer)
 
     async def _dispatch_client_message(
         self,
@@ -148,18 +149,35 @@ class EventSubWebSocketBroadcaster:
         if op == "subscribe":
             chans = data.get("channels")
             if isinstance(chans, list):
-                self._registry.subscribe(ws, [str(c) for c in chans])
+                names = [str(c) for c in chans]
+                self._registry.subscribe(ws, names)
+                self._logger.info(
+                    "websocket subscribe peer=%s channels=%s",
+                    ws.remote_address,
+                    names,
+                )
             return
 
         if op == "unsubscribe":
             chans = data.get("channels")
             if isinstance(chans, list):
-                self._registry.unsubscribe(ws, [str(c) for c in chans])
+                names = [str(c) for c in chans]
+                self._registry.unsubscribe(ws, names)
+                self._logger.info(
+                    "websocket unsubscribe peer=%s channels=%s",
+                    ws.remote_address,
+                    names,
+                )
             return
 
         if op == "list":
             subs = sorted(self._registry.channels_for(ws))
             await ws.send(json.dumps({"op": "list", "channels": subs}))
+            self._logger.info(
+                "websocket list peer=%s subscriptions=%s",
+                ws.remote_address,
+                subs,
+            )
             return
 
         self._logger.debug("unknown ws op=%r from %s", op, ws.remote_address)
